@@ -1,6 +1,6 @@
 import streamlit as st
 import random
-from qiskit import QuantumCircuit, Aer, execute
+from qiskit import QuantumCircuit, BasicAer, execute
 import matplotlib.pyplot as plt
 import base64
 from io import BytesIO
@@ -30,7 +30,7 @@ def encode_qubits(bits, bases):
     return circuits
 
 def eve_intercept(circuits):
-    backend = Aer.get_backend('qasm_simulator')
+    backend = BasicAer.get_backend('qasm_simulator')
     eve_bases = [random.choice(['Z', 'X']) for _ in range(len(circuits))]
     new_circuits = []
 
@@ -51,7 +51,7 @@ def eve_intercept(circuits):
     return new_circuits
 
 def measure_qubits(circuits, bob_bases):
-    backend = Aer.get_backend('qasm_simulator')
+    backend = BasicAer.get_backend('qasm_simulator')
     results = []
     for i, qc in enumerate(circuits):
         new_qc = qc.copy()
