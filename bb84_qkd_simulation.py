@@ -1,5 +1,5 @@
 import random
-from qiskit import QuantumCircuit, Aer, execute
+from qiskit import QuantumCircuit, BasicAer, execute
 import matplotlib.pyplot as plt
 
 # --- Step 1: Alice creates random bits and bases ---
@@ -22,7 +22,7 @@ def encode_qubits(bits, bases):
 
 # --- Step 3: Eve intercepts and measures ---
 def eve_intercept(circuits):
-    backend = Aer.get_backend('qasm_simulator')
+    backend = BasicAer.get_backend('qasm_simulator')
     eve_bases = [random.choice(['Z', 'X']) for _ in range(len(circuits))]
     new_circuits = []
 
@@ -48,7 +48,7 @@ def eve_intercept(circuits):
 
 # --- Step 4: Bob measures ---
 def measure_qubits(circuits, bob_bases):
-    backend = Aer.get_backend('qasm_simulator')
+    backend = BasicAer.get_backend('qasm_simulator')
     results = []
 
     for i, qc in enumerate(circuits):
