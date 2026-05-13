@@ -1,7 +1,9 @@
 import streamlit as st
 import random
-from qiskit import QuantumCircuit, BasicAer, execute
+from qiskit import QuantumCircuit, transpile
+from qiskit_aer import Aer
 import matplotlib.pyplot as plt
+from visuals import bloch_sphere, photon_transmission, basis_matching_visual
 import base64
 from io import BytesIO
 
@@ -30,7 +32,7 @@ def encode_qubits(bits, bases):
     return circuits
 
 def eve_intercept(circuits):
-    backend = BasicAer.get_backend('qasm_simulator')
+    backend = Aer.get_backend('qasm_simulator')
     eve_bases = [random.choice(['Z', 'X']) for _ in range(len(circuits))]
     new_circuits = []
 
@@ -39,7 +41,8 @@ def eve_intercept(circuits):
         if eve_bases[i] == 'X':
             eve_circuit.h(0)
         eve_circuit.measure(0, 0)
-        job = execute(eve_circuit, backend, shots=1, memory=True)
+        t_qc = transpile(eve_circuit, backend)
+        job = backend.run(t_qc, shots=1, memory=True)
         result = int(job.result().get_memory()[0])
 
         re_qc = QuantumCircuit(1, 1)
@@ -51,14 +54,15 @@ def eve_intercept(circuits):
     return new_circuits
 
 def measure_qubits(circuits, bob_bases):
-    backend = BasicAer.get_backend('qasm_simulator')
+    backend = Aer.get_backend('qasm_simulator')
     results = []
     for i, qc in enumerate(circuits):
         new_qc = qc.copy()
         if bob_bases[i] == 'X':
             new_qc.h(0)
         new_qc.measure(0, 0)
-        job = execute(new_qc, backend, shots=1, memory=True)
+        t_qc = transpile(new_qc, backend)
+        job = backend.run(t_qc, shots=1, memory=True)
         result = int(job.result().get_memory()[0])
         results.append(result)
     return results
@@ -96,40 +100,75 @@ def plot_qber_bar(qber):
     return fig
 
 # --- Streamlit App ---
-st.set_page_config(page_title="Quantum Key Distribution Simulator", layout="centered")
+st.set_page_config(page_title="Quantum Key Distribution Simulator", layout="wide")
 st.title("🔐 BB84 Quantum Key Distribution Simulator")
 
-n = st.slider("Select number of qubits", min_value=10, max_value=200, value=100, step=10)
-eve_present = st.checkbox("Simulate Eavesdropper (Eve)?", value=True)
+tab1, tab2 = st.tabs(["🚀 Simulation", "🎓 Visual Learning"])
 
-if st.button("Run Simulation"):
-    st.info("Running QKD simulation...")
-    alice_bits, alice_bases = create_bits_bases(n)
-    bob_bases = [random.choice(['Z', 'X']) for _ in range(n)]
+with tab1:
+    n = st.slider("Select number of qubits", min_value=10, max_value=200, value=100, step=10)
+    eve_present = st.checkbox("Simulate Eavesdropper (Eve)?", value=True)
 
-    encoded = encode_qubits(alice_bits, alice_bases)
+    if st.button("Run Simulation"):
+        st.info("Running QKD simulation...")
+        alice_bits, alice_bases = create_bits_bases(n)
+        bob_bases = [random.choice(['Z', 'X']) for _ in range(n)]
 
-    if eve_present:
-        intercepted = eve_intercept(encoded)
-    else:
-        intercepted = encoded
+        encoded = encode_qubits(alice_bits, alice_bases)
 
-    bob_results = measure_qubits(intercepted, bob_bases)
-    key_a, key_b = sift_keys(alice_bases, bob_bases, alice_bits, bob_results)
-    qber = calculate_qber(key_a, key_b)
+        if eve_present:
+            intercepted = eve_intercept(encoded)
+        else:
+            intercepted = encoded
 
-    st.subheader("📬 Sifted Key Result")
-    st.text(f"Alice's Key: {key_a}")
-    st.text(f"Bob's Key:   {key_b}")
-    st.markdown(f"### ❗ QBER: `{qber * 100:.2f}%`")
+        bob_results = measure_qubits(intercepted, bob_bases)
+        key_a, key_b = sift_keys(alice_bases, bob_bases, alice_bits, bob_results)
+        qber = calculate_qber(key_a, key_b)
 
-    if qber > 0.15:
-        st.error("⚠️ High QBER! Potential eavesdropping detected.")
-    else:
-        st.success("✅ Low QBER. Communication likely secure.")
+        st.subheader("📬 Sifted Key Result")
+        st.text(f"Alice's Key: {key_a}")
+        st.text(f"Bob's Key:   {key_b}")
+        st.markdown(f"### ❗ QBER: `{qber * 100:.2f}%`")
 
-    st.subheader("🔍 Bit Differences")
-    st.pyplot(plot_bit_differences(key_a, key_b))
+        if qber > 0.15:
+            st.error("⚠️ High QBER! Potential eavesdropping detected.")
+        else:
+            st.success("✅ Low QBER. Communication likely secure.")
 
-    st.subheader("📊 QBER Distribution")
-    st.pyplot(plot_qber_bar(qber))
+        st.subheader("🔍 Basis Matching")
+        basis_matching_visual(alice_bases[:20], bob_bases[:20])
+
+        st.subheader("🔍 Bit Differences")
+        st.pyplot(plot_bit_differences(key_a, key_b))
+
+        st.subheader("📊 QBER Distribution")
+        st.pyplot(plot_qber_bar(qber))
+
+with tab2:
+    st.header("Visual Quantum Learning")
+
+    st.subheader("1. Qubit States & Bloch Sphere")
+    st.write("In the BB84 protocol, Alice encodes bits into qubits using two different bases: Z-basis (|0>, |1>) and X-basis (|+>, |->).")
+
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.markdown("**State |0>** (Z-basis)")
+        bloch_sphere(state_vector=[0, 0, 1], height=300)
+    with col2:
+        st.markdown("**State |1>** (Z-basis)")
+        bloch_sphere(state_vector=[0, 0, -1], height=300)
+    with col3:
+        st.markdown("**State |+>** (X-basis)")
+        bloch_sphere(state_vector=[1, 0, 0], height=300)
+    with col4:
+        st.markdown("**State |->** (X-basis)")
+        bloch_sphere(state_vector=[-1, 0, 0], height=300)
+
+    st.subheader("2. Photon Transmission")
+    st.write("Alice sends qubits (photons) to Bob. If Eve is present, she might intercept and measure them, which introduces errors.")
+    photon_transmission(n_photons=8)
+
+    st.subheader("3. Live Basis Matching")
+    st.write("After transmission, Alice and Bob announce their bases. They keep bits only where their bases matched.")
+    basis_matching_visual(['Z', 'X', 'Z', 'Z', 'X', 'Z', 'X', 'X', 'Z', 'X'],
+                          ['Z', 'Z', 'Z', 'X', 'X', 'Z', 'X', 'Z', 'Z', 'Z'])
