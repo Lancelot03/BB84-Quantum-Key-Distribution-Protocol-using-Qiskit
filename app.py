@@ -8,6 +8,7 @@ except ImportError:
     QiskitRuntimeService = None
 import matplotlib.pyplot as plt
 from visuals import bloch_sphere, photon_transmission, basis_matching_visual
+from core import bb84, b92, attacks, metrics
 import base64
 from io import BytesIO
 
@@ -17,107 +18,6 @@ def fig_to_base64(fig):
     fig.savefig(buf, format='png', bbox_inches='tight')
     buf.seek(0)
     return base64.b64encode(buf.read()).decode('utf-8')
-
-# Quantum Logic Functions
-def create_bits_bases(n):
-    bits = [random.randint(0, 1) for _ in range(n)]
-    bases = [random.choice(['Z', 'X']) for _ in range(n)]
-    return bits, bases
-
-def encode_qubits(bits, bases):
-    circuits = []
-    for bit, base in zip(bits, bases):
-        qc = QuantumCircuit(1, 1)
-        if bit == 1:
-            qc.x(0)
-        if base == 'X':
-            qc.h(0)
-        circuits.append(qc)
-    return circuits
-
-def eve_intercept(circuits, attack_type="Intercept-Resend", noise_level=0.1):
-    backend = Aer.get_backend('qasm_simulator')
-    new_circuits = []
-
-    if attack_type == "Intercept-Resend":
-        eve_bases = [random.choice(['Z', 'X']) for _ in range(len(circuits))]
-        for i, qc in enumerate(circuits):
-            eve_circuit = qc.copy()
-            if eve_bases[i] == 'X':
-                eve_circuit.h(0)
-            eve_circuit.measure(0, 0)
-            t_qc = transpile(eve_circuit, backend)
-            job = backend.run(t_qc, shots=1, memory=True)
-            result = int(job.result().get_memory()[0])
-
-            re_qc = QuantumCircuit(1, 1)
-            if result == 1:
-                re_qc.x(0)
-            if eve_bases[i] == 'X':
-                re_qc.h(0)
-            new_circuits.append(re_qc)
-
-    elif attack_type == "Noisy Channel":
-        for qc in circuits:
-            noisy_qc = qc.copy()
-            if random.random() < noise_level:
-                noisy_qc.x(0) # Bit flip noise
-            new_circuits.append(noisy_qc)
-
-    elif attack_type == "Photon Number Splitting":
-        # In PNS, Eve splits off one photon from multi-photon pulses.
-        # This doesn't disturb the signal Bob receives, but Eve gets the bit.
-        # We simulate this by Alice's key being partially known to Eve without QBER increase.
-        # For simplicity, we'll introduce a tiny amount of noise to show Eve is active
-        # but less than Intercept-Resend.
-        for qc in circuits:
-            noisy_qc = qc.copy()
-            if random.random() < 0.02: # Very low disturbance
-                noisy_qc.x(0)
-            new_circuits.append(noisy_qc)
-
-    return new_circuits
-
-def measure_qubits(circuits, bob_bases, use_hardware=False, api_key=""):
-    results = []
-
-    if use_hardware and api_key:
-        try:
-            service = QiskitRuntimeService(channel="ibm_quantum", token=api_key)
-            backend = service.least_busy(operational=True, simulator=False)
-            st.sidebar.success(f"Connected to hardware: {backend.name}")
-            # Real hardware execution would go here.
-            # For this simulator, we use the backend's simulator if available
-            # or Aer to ensure immediate results for the user experience.
-            backend = Aer.get_backend('qasm_simulator')
-        except Exception as e:
-            st.sidebar.error(f"Error connecting to IBM: {e}")
-            backend = Aer.get_backend('qasm_simulator')
-    else:
-        backend = Aer.get_backend('qasm_simulator')
-
-    for i, qc in enumerate(circuits):
-        new_qc = qc.copy()
-        if bob_bases[i] == 'X':
-            new_qc.h(0)
-        new_qc.measure(0, 0)
-        t_qc = transpile(new_qc, backend)
-        job = backend.run(t_qc, shots=1, memory=True)
-        result = int(job.result().get_memory()[0])
-        results.append(result)
-    return results
-
-def sift_keys(alice_bases, bob_bases, alice_bits, bob_bits):
-    sifted_a, sifted_b = [], []
-    for i in range(len(alice_bits)):
-        if alice_bases[i] == bob_bases[i]:
-            sifted_a.append(alice_bits[i])
-            sifted_b.append(bob_bits[i])
-    return sifted_a, sifted_b
-
-def calculate_qber(key_a, key_b):
-    errors = sum(a != b for a, b in zip(key_a, key_b))
-    return errors / len(key_a) if key_a else 0.0
 
 # Plotting Functions
 def plot_bit_differences(key_a, key_b):
@@ -141,19 +41,39 @@ def plot_qber_bar(qber):
 
 # --- Protocols ---
 def run_bb84(n, eve_present, attack_type, noise_level, use_real_hardware, ibm_api_key):
-    alice_bits, alice_bases = create_bits_bases(n)
-    bob_bases = [random.choice(['Z', 'X']) for _ in range(n)]
+    alice_bits, alice_bases = bb84.generate_alice_bits_and_bases(n)
+    bob_bases = bb84.generate_bob_bases(n)
 
-    encoded = encode_qubits(alice_bits, alice_bases)
+    encoded_circuits = bb84.encode_qubits(alice_bits, alice_bases)
 
     if eve_present:
-        intercepted = eve_intercept(encoded, attack_type, noise_level)
+        if attack_type == "Intercept-Resend":
+            intercepted_circuits, _ = attacks.intercept_resend(encoded_circuits)
+        elif attack_type == "Noisy Channel":
+            intercepted_circuits = attacks.noisy_channel(encoded_circuits, noise_level)
+        elif attack_type == "Photon Number Splitting":
+            intercepted_circuits = attacks.photon_number_splitting(encoded_circuits)
+        else:
+            intercepted_circuits = encoded_circuits
     else:
-        intercepted = encoded
+        intercepted_circuits = encoded_circuits
 
-    bob_results = measure_qubits(intercepted, bob_bases, use_real_hardware, ibm_api_key)
-    key_a, key_b = sift_keys(alice_bases, bob_bases, alice_bits, bob_results)
-    qber = calculate_qber(key_a, key_b)
+    # Backend selection logic simplified for simulation
+    backend = Aer.get_backend('qasm_simulator')
+    if use_real_hardware and ibm_api_key and QiskitRuntimeService:
+        try:
+            service = QiskitRuntimeService(channel="ibm_quantum", token=ibm_api_key)
+            backend = service.least_busy(operational=True, simulator=False)
+            st.sidebar.success(f"Connected to hardware: {backend.name}")
+        except Exception as e:
+            st.sidebar.error(f"Error connecting to IBM: {e}")
+
+    bob_results = bb84.measure_qubits(intercepted_circuits, bob_bases, backend=backend)
+    key_a, key_b, _ = bb84.sift_keys(alice_bases, bob_bases, alice_bits, bob_results)
+    qber = metrics.calculate_qber(key_a, key_b)
+
+    # Generate detailed report
+    report = metrics.generate_error_report(alice_bits, bob_results, alice_bases, bob_bases, key_a, key_b)
 
     return {
         "alice_bits": alice_bits,
@@ -162,66 +82,13 @@ def run_bb84(n, eve_present, attack_type, noise_level, use_real_hardware, ibm_ap
         "bob_results": bob_results,
         "key_a": key_a,
         "key_b": key_b,
-        "qber": qber
+        "qber": qber,
+        "report": report,
+        "circuits": encoded_circuits[:5] # Return a few circuits for visualization
     }
 
-def run_b92(n, eve_present, noise_level):
-    # Alice sends 0 as |0> and 1 as |+>
-    alice_bits = [random.randint(0, 1) for _ in range(n)]
-    circuits = []
-    for bit in alice_bits:
-        qc = QuantumCircuit(1, 1)
-        if bit == 1:
-            qc.h(0)
-        circuits.append(qc)
-
-    # Bob measures in X-basis for 0 and Z-basis for 1 (or vice versa)
-    # Actually Bob measures in {|+>, |->} and {|0>, |1>}
-    bob_bases = [random.choice(['Z', 'X']) for _ in range(n)]
-
-    # Intercept-resend for B92 (Simplified)
-    if eve_present:
-        # Just add noise for now
-        intercepted = []
-        for qc in circuits:
-            nqc = qc.copy()
-            if random.random() < noise_level:
-                nqc.x(0)
-            intercepted.append(nqc)
-    else:
-        intercepted = circuits
-
-    backend = Aer.get_backend('qasm_simulator')
-    bob_results = []
-    for i, qc in enumerate(intercepted):
-        nqc = qc.copy()
-        if bob_bases[i] == 'X': # Measure in X
-            nqc.h(0)
-        nqc.measure(0, 0)
-        t_qc = transpile(nqc, backend)
-        job = backend.run(t_qc, shots=1, memory=True)
-        bob_results.append(int(job.result().get_memory()[0]))
-
-    # Sifting for B92: Bob only keeps bits where he got "1" (conclusive result)
-    key_a, key_b = [], []
-    for i in range(n):
-        if bob_results[i] == 1:
-            # If Bob measured 1 in Z, Alice must have sent |+> (1)
-            # If Bob measured 1 in X, Alice must have sent |0> (0)
-            key_b_bit = 1 if bob_bases[i] == 'Z' else 0
-            key_a.append(alice_bits[i])
-            key_b.append(key_b_bit)
-
-    qber = calculate_qber(key_a, key_b)
-    return {
-        "alice_bits": alice_bits,
-        "alice_bases": ["B92"] * n,
-        "bob_bases": bob_bases,
-        "bob_results": bob_results,
-        "key_a": key_a,
-        "key_b": key_b,
-        "qber": qber
-    }
+def run_b92_simulation(n, eve_present, noise_level):
+    return b92.run_b92(n, eve_present, noise_level)
 
 # --- Streamlit App ---
 st.set_page_config(page_title="Quantum Key Distribution Simulator", layout="wide")
@@ -252,11 +119,12 @@ with tab1:
         if protocol == "BB84":
             results = run_bb84(n, eve_present, attack_type, noise_level, use_real_hardware, ibm_api_key)
         else:
-            results = run_b92(n, eve_present, noise_level)
+            results = run_b92_simulation(n, eve_present, noise_level)
 
         key_a, key_b = results["key_a"], results["key_b"]
         qber = results["qber"]
         alice_bases, bob_bases = results["alice_bases"], results["bob_bases"]
+        report = results.get("report")
 
         st.subheader("📬 Sifted Key Result")
         st.text(f"Alice's Key: {key_a}")
@@ -267,6 +135,19 @@ with tab1:
             st.error("⚠️ High QBER! Potential eavesdropping detected.")
         else:
             st.success("✅ Low QBER. Communication likely secure.")
+
+        if "circuits" in results:
+            with st.expander("🛠️ Quantum Circuit Preview (First 5 Qubits)"):
+                for i, qc in enumerate(results["circuits"]):
+                    st.write(f"Qubit {i} (Basis: {alice_bases[i]}, Bit: {results['alice_bits'][i]})")
+                    st.pyplot(qc.draw('mpl'))
+
+        if report:
+            st.subheader("📊 Detailed Error Analysis")
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Basis Matching Efficiency", f"{report['basis_match_efficiency']:.1f}%")
+            col2.metric("Z-Basis Error Rate", f"{report['z_error_rate']*100:.1f}%")
+            col3.metric("X-Basis Error Rate", f"{report['x_error_rate']*100:.1f}%")
 
         st.subheader("🔍 Basis Matching")
         basis_matching_visual(alice_bases[:20], bob_bases[:20])
@@ -292,7 +173,7 @@ with tab2:
         st.subheader("Quantum Bit Error Rate (QBER)")
         st.write("The security of BB84 relies on detecting errors introduced by an eavesdropper. QBER is defined as:")
         st.latex(r"QBER = \frac{\text{Number of mismatched bits}}{\text{Total compared bits}}")
-        st.write("Typically, if $QBER > 11\%$, the key is considered compromised.")
+        st.write(r"Typically, if $QBER > 11\%$, the key is considered compromised.")
 
     with visual_tab:
         st.subheader("1. Qubit States & Bloch Sphere")
