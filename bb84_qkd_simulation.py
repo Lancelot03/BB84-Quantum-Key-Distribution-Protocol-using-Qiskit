@@ -1,5 +1,6 @@
 import random
-from qiskit import QuantumCircuit, BasicAer, execute
+from qiskit import QuantumCircuit, transpile
+from qiskit_aer import Aer
 import matplotlib.pyplot as plt
 
 # --- Step 1: Alice creates random bits and bases ---
@@ -22,7 +23,7 @@ def encode_qubits(bits, bases):
 
 # --- Step 3: Eve intercepts and measures ---
 def eve_intercept(circuits):
-    backend = BasicAer.get_backend('qasm_simulator')
+    backend = Aer.get_backend('qasm_simulator')
     eve_bases = [random.choice(['Z', 'X']) for _ in range(len(circuits))]
     new_circuits = []
 
@@ -34,7 +35,8 @@ def eve_intercept(circuits):
         if eve_bases[i] == 'X':
             new_qc.h(0)
         new_qc.measure(0, 0)
-        job = execute(new_qc, backend, shots=1, memory=True)
+        t_qc = transpile(new_qc, backend)
+        job = backend.run(t_qc, shots=1, memory=True)
         result = int(job.result().get_memory()[0])
 
         # Eve re-encodes
@@ -48,7 +50,7 @@ def eve_intercept(circuits):
 
 # --- Step 4: Bob measures ---
 def measure_qubits(circuits, bob_bases):
-    backend = BasicAer.get_backend('qasm_simulator')
+    backend = Aer.get_backend('qasm_simulator')
     results = []
 
     for i, qc in enumerate(circuits):
@@ -56,7 +58,8 @@ def measure_qubits(circuits, bob_bases):
         if bob_bases[i] == 'X':
             qc_copy.h(0)
         qc_copy.measure(0, 0)
-        job = execute(qc_copy, backend, shots=1, memory=True)
+        t_qc = transpile(qc_copy, backend)
+        job = backend.run(t_qc, shots=1, memory=True)
         result = job.result().get_memory()[0]
         results.append(int(result))
     return results
