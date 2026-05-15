@@ -1,7 +1,7 @@
 import random
 from qiskit import QuantumCircuit, transpile
 from qiskit_aer import Aer
-from core import metrics
+from . import stats
 
 def run_b92(n, eve_present, noise_level):
     """
@@ -53,7 +53,7 @@ def run_b92(n, eve_present, noise_level):
             key_a.append(alice_bits[i])
             key_b.append(key_b_bit)
 
-    qber = metrics.calculate_qber(key_a, key_b)
+    qber = stats.calculate_qber(key_a, key_b)
     return {
         "alice_bits": alice_bits,
         "alice_bases": ["B92"] * n,
