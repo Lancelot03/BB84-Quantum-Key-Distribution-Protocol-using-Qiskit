@@ -91,6 +91,12 @@ def bloch_sphere(state_vector=[1, 0, 0], height=500):
     """
     return components.html(html_code, height=height)
 
+def draw_circuit_visual(qc):
+    """
+    Returns a matplotlib figure of the quantum circuit.
+    """
+    return qc.draw(output='mpl')
+
 def photon_transmission(n_photons=10, height=300):
     html_code = f"""
     <!DOCTYPE html>

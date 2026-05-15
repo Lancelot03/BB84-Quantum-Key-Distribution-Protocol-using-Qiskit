@@ -1,12 +1,28 @@
 import streamlit as st
 import random
-from qiskit import QuantumCircuit, transpile
 from qiskit_aer import Aer
 try:
-    from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2 as Sampler
+    from qiskit_ibm_runtime import QiskitRuntimeService
 except ImportError:
     QiskitRuntimeService = None
 import matplotlib.pyplot as plt
+from visuals import bloch_sphere, photon_transmission, basis_matching_visual, draw_circuit_visual
+from core import BB84Protocol, InterceptResend, NoisyChannel, PhotonNumberSplitting, calculate_qber, analyze_security
+
+# --- Quantum Logic Functions (Now using Core) ---
+
+def get_backend(use_hardware=False, api_key=""):
+    if use_hardware and api_key:
+        try:
+            service = QiskitRuntimeService(channel="ibm_quantum", token=api_key)
+            backend = service.least_busy(operational=True, simulator=False)
+            st.sidebar.success(f"Connected to hardware: {backend.name}")
+            return backend
+        except Exception as e:
+            st.sidebar.error(f"Error connecting to IBM: {e}")
+            return Aer.get_backend('qasm_simulator')
+    else:
+        return Aer.get_backend('qasm_simulator')
 from visuals import bloch_sphere, photon_transmission, basis_matching_visual
 from core import bb84, b92, attacks, metrics
 import base64
@@ -95,11 +111,11 @@ st.set_page_config(page_title="Quantum Key Distribution Simulator", layout="wide
 
 # Sidebar for Hardware Settings
 st.sidebar.title("🛠️ Settings")
-protocol = st.sidebar.selectbox("Select Protocol", ["BB84", "B92"])
+protocol_choice = st.sidebar.selectbox("Select Protocol", ["BB84"]) # B92 removed for now as we focus on BB84 core
 use_real_hardware = st.sidebar.checkbox("Use Real Quantum Hardware (IBM)?", value=False)
 ibm_api_key = st.sidebar.text_input("IBM Quantum API Key", type="password", disabled=not use_real_hardware)
 
-st.title("🔐 BB84 Quantum Key Distribution Simulator")
+st.title("🔐 Quantum Key Distribution Simulator")
 
 tab1, tab2 = st.tabs(["🚀 Simulation", "🎓 Visual Learning"])
 
@@ -110,15 +126,36 @@ with tab1:
         eve_present = st.checkbox("Simulate Eavesdropper (Eve)?", value=True)
 
     with col_b:
-        attack_type = st.selectbox("Attack Model", ["Intercept-Resend", "Noisy Channel", "Photon Number Splitting"], disabled=not eve_present)
-        noise_level = st.slider("Channel Noise / Attack Strength", 0.0, 0.5, 0.1, disabled=(not eve_present or attack_type == "Photon Number Splitting"))
+        attack_choice = st.selectbox("Attack Model", ["Intercept-Resend", "Noisy Channel", "Photon Number Splitting"], disabled=not eve_present)
+        noise_level = st.slider("Channel Noise / Attack Strength", 0.0, 0.5, 0.1, disabled=(not eve_present or attack_choice == "Photon Number Splitting"))
 
     if st.button("Run Simulation"):
-        st.info(f"Running {protocol} simulation with {attack_type if eve_present else 'no'} intervention...")
+        backend = get_backend(use_real_hardware, ibm_api_key)
+        protocol = BB84Protocol()
 
-        if protocol == "BB84":
-            results = run_bb84(n, eve_present, attack_type, noise_level, use_real_hardware, ibm_api_key)
+        alice_bits = protocol.generate_bits(n)
+        alice_bases = protocol.generate_bases(n)
+        encoded_qubits = protocol.encode(alice_bits, alice_bases)
+
+        st.info(f"Running BB84 simulation with {attack_choice if eve_present else 'no'} intervention...")
+
+        if eve_present:
+            if attack_choice == "Intercept-Resend":
+                attack = InterceptResend()
+            elif attack_choice == "Noisy Channel":
+                attack = NoisyChannel(noise_level)
+            else:
+                attack = PhotonNumberSplitting()
+            intercepted_qubits = attack.apply(encoded_qubits, backend)
         else:
+            intercepted_qubits = encoded_qubits
+
+        bob_bases = protocol.generate_bases(n)
+        bob_results = protocol.measure(intercepted_qubits, bob_bases, backend)
+
+        key_a, key_b, sifted_indices = protocol.sift(alice_bases, bob_bases, alice_bits, bob_results)
+        qber = calculate_qber(key_a, key_b)
+        is_secure, security_status = analyze_security(qber)
             results = run_b92_simulation(n, eve_present, noise_level)
 
         key_a, key_b = results["key_a"], results["key_b"]
@@ -127,15 +164,20 @@ with tab1:
         report = results.get("report")
 
         st.subheader("📬 Sifted Key Result")
-        st.text(f"Alice's Key: {key_a}")
-        st.text(f"Bob's Key:   {key_b}")
-        st.markdown(f"### ❗ QBER: `{qber * 100:.2f}%`")
+        st.text(f"Alice's Key: {''.join(map(str, key_a))}")
+        st.text(f"Bob's Key:   {''.join(map(str, key_b))}")
+        st.markdown(f"### ❗ QBER: `{qber * 100:.2f}%` - Status: **{security_status}**")
 
-        if qber > 0.15:
+        if not is_secure:
             st.error("⚠️ High QBER! Potential eavesdropping detected.")
         else:
             st.success("✅ Low QBER. Communication likely secure.")
 
+        # Real-time Circuit Display
+        st.subheader("🛠️ Quantum Circuit (First Qubit)")
+        st.pyplot(draw_circuit_visual(encoded_qubits[0]))
+
+        st.subheader("🔍 Basis Matching (First 20)")
         if "circuits" in results:
             with st.expander("🛠️ Quantum Circuit Preview (First 5 Qubits)"):
                 for i, qc in enumerate(results["circuits"]):

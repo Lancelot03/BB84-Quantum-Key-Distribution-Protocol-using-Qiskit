@@ -3,4 +3,5 @@ qiskit==1.0.2
 qiskit-aer==0.13.3
 qiskit-ibm-runtime==0.21.1
 matplotlib==3.8.3
+pylatexenc==2.10
 pylatexenc
