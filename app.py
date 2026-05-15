@@ -23,6 +23,17 @@ def get_backend(use_hardware=False, api_key=""):
             return Aer.get_backend('qasm_simulator')
     else:
         return Aer.get_backend('qasm_simulator')
+from visuals import bloch_sphere, photon_transmission, basis_matching_visual
+from core import bb84, b92, attacks, metrics
+import base64
+from io import BytesIO
+
+# Helper: Convert matplotlib plot to base64 string
+def fig_to_base64(fig):
+    buf = BytesIO()
+    fig.savefig(buf, format='png', bbox_inches='tight')
+    buf.seek(0)
+    return base64.b64encode(buf.read()).decode('utf-8')
 
 # Plotting Functions
 def plot_bit_differences(key_a, key_b):
@@ -43,6 +54,57 @@ def plot_qber_bar(qber):
     ax.set_title(f'QBER: {qber * 100:.2f}%')
     ax.set_ylim(0, 100)
     return fig
+
+# --- Protocols ---
+def run_bb84(n, eve_present, attack_type, noise_level, use_real_hardware, ibm_api_key):
+    alice_bits, alice_bases = bb84.generate_alice_bits_and_bases(n)
+    bob_bases = bb84.generate_bob_bases(n)
+
+    encoded_circuits = bb84.encode_qubits(alice_bits, alice_bases)
+
+    if eve_present:
+        if attack_type == "Intercept-Resend":
+            intercepted_circuits, _ = attacks.intercept_resend(encoded_circuits)
+        elif attack_type == "Noisy Channel":
+            intercepted_circuits = attacks.noisy_channel(encoded_circuits, noise_level)
+        elif attack_type == "Photon Number Splitting":
+            intercepted_circuits = attacks.photon_number_splitting(encoded_circuits)
+        else:
+            intercepted_circuits = encoded_circuits
+    else:
+        intercepted_circuits = encoded_circuits
+
+    # Backend selection logic simplified for simulation
+    backend = Aer.get_backend('qasm_simulator')
+    if use_real_hardware and ibm_api_key and QiskitRuntimeService:
+        try:
+            service = QiskitRuntimeService(channel="ibm_quantum", token=ibm_api_key)
+            backend = service.least_busy(operational=True, simulator=False)
+            st.sidebar.success(f"Connected to hardware: {backend.name}")
+        except Exception as e:
+            st.sidebar.error(f"Error connecting to IBM: {e}")
+
+    bob_results = bb84.measure_qubits(intercepted_circuits, bob_bases, backend=backend)
+    key_a, key_b, _ = bb84.sift_keys(alice_bases, bob_bases, alice_bits, bob_results)
+    qber = metrics.calculate_qber(key_a, key_b)
+
+    # Generate detailed report
+    report = metrics.generate_error_report(alice_bits, bob_results, alice_bases, bob_bases, key_a, key_b)
+
+    return {
+        "alice_bits": alice_bits,
+        "alice_bases": alice_bases,
+        "bob_bases": bob_bases,
+        "bob_results": bob_results,
+        "key_a": key_a,
+        "key_b": key_b,
+        "qber": qber,
+        "report": report,
+        "circuits": encoded_circuits[:5] # Return a few circuits for visualization
+    }
+
+def run_b92_simulation(n, eve_present, noise_level):
+    return b92.run_b92(n, eve_present, noise_level)
 
 # --- Streamlit App ---
 st.set_page_config(page_title="Quantum Key Distribution Simulator", layout="wide")
@@ -94,6 +156,12 @@ with tab1:
         key_a, key_b, sifted_indices = protocol.sift(alice_bases, bob_bases, alice_bits, bob_results)
         qber = calculate_qber(key_a, key_b)
         is_secure, security_status = analyze_security(qber)
+            results = run_b92_simulation(n, eve_present, noise_level)
+
+        key_a, key_b = results["key_a"], results["key_b"]
+        qber = results["qber"]
+        alice_bases, bob_bases = results["alice_bases"], results["bob_bases"]
+        report = results.get("report")
 
         st.subheader("📬 Sifted Key Result")
         st.text(f"Alice's Key: {''.join(map(str, key_a))}")
@@ -110,6 +178,20 @@ with tab1:
         st.pyplot(draw_circuit_visual(encoded_qubits[0]))
 
         st.subheader("🔍 Basis Matching (First 20)")
+        if "circuits" in results:
+            with st.expander("🛠️ Quantum Circuit Preview (First 5 Qubits)"):
+                for i, qc in enumerate(results["circuits"]):
+                    st.write(f"Qubit {i} (Basis: {alice_bases[i]}, Bit: {results['alice_bits'][i]})")
+                    st.pyplot(qc.draw('mpl'))
+
+        if report:
+            st.subheader("📊 Detailed Error Analysis")
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Basis Matching Efficiency", f"{report['basis_match_efficiency']:.1f}%")
+            col2.metric("Z-Basis Error Rate", f"{report['z_error_rate']*100:.1f}%")
+            col3.metric("X-Basis Error Rate", f"{report['x_error_rate']*100:.1f}%")
+
+        st.subheader("🔍 Basis Matching")
         basis_matching_visual(alice_bases[:20], bob_bases[:20])
 
         st.subheader("🔍 Bit Differences")
