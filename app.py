@@ -8,7 +8,7 @@ except ImportError:
 import matplotlib.pyplot as plt
 from visuals import bloch_sphere, photon_transmission, basis_matching_visual, draw_circuit_visual
 from core import BB84Protocol, InterceptResend, NoisyChannel, PhotonNumberSplitting, calculate_qber, analyze_security, generate_error_report
-from core.b92 import run_b92
+from core.b92 import B92Protocol
 
 # --- Quantum Logic Functions ---
 
@@ -118,23 +118,39 @@ with tab1:
                 "encoded_qubits": encoded_qubits
             }
         else:
-            st.info("Running B92 simulation...")
-            results = run_b92(n, eve_present, noise_level)
-            qber = results["qber"]
+            protocol = B92Protocol()
+            alice_bits = protocol.generate_bits(n)
+            encoded_qubits = protocol.encode(alice_bits)
+
+            st.info(f"Running B92 simulation with {'noise' if eve_present else 'no'} intervention...")
+
+            if eve_present:
+                attack = NoisyChannel(noise_level)
+                intercepted_qubits = attack.apply(encoded_qubits, backend)
+            else:
+                intercepted_qubits = encoded_qubits
+
+            bob_bases = protocol.generate_bases(n)
+            bob_results = protocol.measure(intercepted_qubits, bob_bases, backend)
+
+            key_a, key_b, sifted_indices = protocol.sift(None, bob_bases, alice_bits, bob_results)
+            qber = calculate_qber(key_a, key_b)
             is_secure, security_status = analyze_security(qber)
 
+            report = generate_error_report(alice_bits, bob_results, ["B92"] * n, bob_bases, key_a, key_b)
+
             viz_data = {
-                "alice_bits": results["alice_bits"],
-                "alice_bases": results["alice_bases"],
-                "bob_bases": results["bob_bases"],
-                "bob_results": results["bob_results"],
-                "key_a": results["key_a"],
-                "key_b": results["key_b"],
+                "alice_bits": alice_bits,
+                "alice_bases": ["B92"] * n,
+                "bob_bases": bob_bases,
+                "bob_results": bob_results,
+                "key_a": key_a,
+                "key_b": key_b,
                 "qber": qber,
-                "report": results.get("report"),
+                "report": report,
                 "is_secure": is_secure,
                 "security_status": security_status,
-                "encoded_qubits": None # B92 doesn't return circuits currently
+                "encoded_qubits": encoded_qubits
             }
 
         st.subheader("📬 Sifted Key Result")

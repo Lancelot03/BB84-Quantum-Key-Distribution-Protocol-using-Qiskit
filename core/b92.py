@@ -1,24 +1,71 @@
 import random
 from qiskit import QuantumCircuit, transpile
-from qiskit_aer import Aer
+from qiskit_aer import AerSimulator
+from core.protocol import QKDProtocol
 from core import stats
+
+class B92Protocol(QKDProtocol):
+    def generate_bits(self, n):
+        return [random.randint(0, 1) for _ in range(n)]
+
+    def generate_bases(self, n):
+        """For B92, this returns Bob's measurement bases."""
+        return [random.choice(['Z', 'X']) for _ in range(n)]
+
+    def encode(self, bits, bases=None):
+        """
+        Alice encodes bits: 0 -> |0>, 1 -> |+>
+        'bases' is ignored for Alice in B92.
+        """
+        circuits = []
+        for bit in bits:
+            qc = QuantumCircuit(1, 1)
+            if bit == 1:
+                qc.h(0)
+            circuits.append(qc)
+        return circuits
+
+    def measure(self, circuits, bob_bases, backend=None):
+        if backend is None:
+            backend = AerSimulator()
+
+        bob_results = []
+        for i, qc in enumerate(circuits):
+            nqc = qc.copy()
+            if bob_bases[i] == 'X':  # Measure in X
+                nqc.h(0)
+            nqc.measure(0, 0)
+            t_qc = transpile(nqc, backend)
+            job = backend.run(t_qc, shots=1)
+            result = int(list(job.result().get_counts().keys())[0])
+            bob_results.append(result)
+        return bob_results
+
+    def sift(self, alice_bases, bob_bases, alice_bits, bob_results):
+        """
+        Sifting for B92: Bob only keeps bits where he got '1' (conclusive result).
+        'alice_bases' is ignored.
+        """
+        key_a, key_b = [], []
+        indices = []
+        for i in range(len(bob_results)):
+            if bob_results[i] == 1:
+                # If Bob measured 1 in Z, Alice must have sent |+> (1)
+                # If Bob measured 1 in X, Alice must have sent |0> (0)
+                key_b_bit = 1 if bob_bases[i] == 'Z' else 0
+                key_a.append(alice_bits[i])
+                key_b.append(key_b_bit)
+                indices.append(i)
+        return key_a, key_b, indices
 
 def run_b92(n, eve_present, noise_level):
     """
-    Simulate the B92 protocol.
+    Legacy function maintained for compatibility until app.py is updated.
     """
-    # Alice sends 0 as |0> and 1 as |+>
-    alice_bits = [random.randint(0, 1) for _ in range(n)]
-    circuits = []
-    for bit in alice_bits:
-        qc = QuantumCircuit(1, 1)
-        if bit == 1:
-            qc.h(0)
-        circuits.append(qc)
-
-    # Bob measures in X-basis for 0 and Z-basis for 1 (or vice versa)
-    # Actually Bob measures in {|+>, |->} and {|0>, |1>}
-    bob_bases = [random.choice(['Z', 'X']) for _ in range(n)]
+    protocol = B92Protocol()
+    alice_bits = protocol.generate_bits(n)
+    circuits = protocol.encode(alice_bits)
+    bob_bases = protocol.generate_bases(n)
 
     # Intercept-resend for B92 (Simplified)
     if eve_present:
@@ -32,26 +79,8 @@ def run_b92(n, eve_present, noise_level):
     else:
         intercepted = circuits
 
-    backend = Aer.get_backend('qasm_simulator')
-    bob_results = []
-    for i, qc in enumerate(intercepted):
-        nqc = qc.copy()
-        if bob_bases[i] == 'X': # Measure in X
-            nqc.h(0)
-        nqc.measure(0, 0)
-        t_qc = transpile(nqc, backend)
-        job = backend.run(t_qc, shots=1, memory=True)
-        bob_results.append(int(job.result().get_memory()[0]))
-
-    # Sifting for B92: Bob only keeps bits where he got "1" (conclusive result)
-    key_a, key_b = [], []
-    for i in range(n):
-        if bob_results[i] == 1:
-            # If Bob measured 1 in Z, Alice must have sent |+> (1)
-            # If Bob measured 1 in X, Alice must have sent |0> (0)
-            key_b_bit = 1 if bob_bases[i] == 'Z' else 0
-            key_a.append(alice_bits[i])
-            key_b.append(key_b_bit)
+    bob_results = protocol.measure(intercepted, bob_bases)
+    key_a, key_b, _ = protocol.sift(None, bob_bases, alice_bits, bob_results)
 
     qber = stats.calculate_qber(key_a, key_b)
     return {

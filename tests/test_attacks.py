@@ -44,5 +44,10 @@ def test_noisy_channel_impact():
 
     qber = calculate_qber(alice_bits, bob_results)
 
-    # Noisy channel with 0.2 noise level should introduce ~20% error
-    assert 0.1 < qber < 0.3
+    # Depolarizing noise with 0.2 noise level introduces errors
+    # and we expect QBER to be around noise_level * (2/3) roughly
+    # since Z flips affect Z basis, Y flips affect both, X flips affect X (in Alice's bases)
+    # Actually, for Z-basis: X and Y flips cause error. (2/3 * noise_level)
+    # For X-basis: Z and Y flips cause error. (2/3 * noise_level)
+    # So total error rate is roughly 2/3 * noise_level = 0.133
+    assert 0.05 < qber < 0.25
