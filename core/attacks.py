@@ -1,7 +1,7 @@
 import random
 from abc import ABC, abstractmethod
 from qiskit import QuantumCircuit, transpile
-from qiskit_aer import Aer
+from qiskit_aer import AerSimulator
 
 class Attack(ABC):
     @abstractmethod
@@ -12,7 +12,7 @@ class Attack(ABC):
 class InterceptResend(Attack):
     def apply(self, circuits, backend=None):
         if backend is None:
-            backend = Aer.get_backend('qasm_simulator')
+            backend = AerSimulator()
 
         new_circuits = []
         eve_bases = [random.choice(['Z', 'X']) for _ in range(len(circuits))]
@@ -22,8 +22,8 @@ class InterceptResend(Attack):
                 eve_circuit.h(0)
             eve_circuit.measure(0, 0)
             t_qc = transpile(eve_circuit, backend)
-            job = backend.run(t_qc, shots=1, memory=True)
-            result = int(job.result().get_memory()[0])
+            job = backend.run(t_qc, shots=1)
+            result = int(list(job.result().get_counts().keys())[0])
 
             re_qc = QuantumCircuit(1, 1)
             if result == 1:

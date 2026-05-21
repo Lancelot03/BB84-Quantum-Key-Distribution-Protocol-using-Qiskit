@@ -1,6 +1,6 @@
 import pytest
 from core.bb84 import BB84Protocol
-from qiskit_aer import Aer
+from qiskit_aer import AerSimulator
 
 def test_bb84_generate_bits():
     protocol = BB84Protocol()
@@ -29,7 +29,7 @@ def test_bb84_sift():
 
 def test_bb84_full_no_eve():
     protocol = BB84Protocol()
-    backend = Aer.get_backend('qasm_simulator')
+    backend = AerSimulator()
     n = 20
 
     alice_bits = protocol.generate_bits(n)
