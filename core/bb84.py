@@ -1,6 +1,6 @@
 import random
 from qiskit import QuantumCircuit, transpile
-from qiskit_aer import Aer
+from qiskit_aer import AerSimulator
 from core.protocol import QKDProtocol
 
 class BB84Protocol(QKDProtocol):
@@ -23,7 +23,7 @@ class BB84Protocol(QKDProtocol):
 
     def measure(self, circuits, bases, backend=None):
         if backend is None:
-            backend = Aer.get_backend('qasm_simulator')
+            backend = AerSimulator()
 
         results = []
         for i, qc in enumerate(circuits):
@@ -32,8 +32,10 @@ class BB84Protocol(QKDProtocol):
                 new_qc.h(0)
             new_qc.measure(0, 0)
             t_qc = transpile(new_qc, backend)
-            job = backend.run(t_qc, shots=1, memory=True)
-            result = int(job.result().get_memory()[0])
+            job = backend.run(t_qc, shots=1)
+            counts = job.result().get_counts()
+            # Get the bit result (0 or 1) from the counts dictionary
+            result = int(max(counts, key=counts.get))
             results.append(result)
         return results
 

@@ -1,6 +1,6 @@
 import streamlit as st
 import random
-from qiskit_aer import Aer
+from qiskit_aer import AerSimulator
 try:
     from qiskit_ibm_runtime import QiskitRuntimeService
 except ImportError:
@@ -8,7 +8,7 @@ except ImportError:
 import matplotlib.pyplot as plt
 from visuals import bloch_sphere, photon_transmission, basis_matching_visual, draw_circuit_visual
 from core import BB84Protocol, InterceptResend, NoisyChannel, PhotonNumberSplitting, calculate_qber, analyze_security, generate_error_report
-from core.b92 import run_b92
+from core.b92 import B92Protocol
 
 # --- Quantum Logic Functions ---
 
@@ -21,9 +21,9 @@ def get_backend(use_hardware=False, api_key=""):
             return backend
         except Exception as e:
             st.sidebar.error(f"Error connecting to IBM: {e}")
-            return Aer.get_backend('qasm_simulator')
+            return AerSimulator()
     else:
-        return Aer.get_backend('qasm_simulator')
+        return AerSimulator()
 
 # Plotting Functions
 def plot_bit_differences(key_a, key_b):
@@ -65,12 +65,8 @@ with tab1:
         eve_present = st.checkbox("Simulate Eavesdropper (Eve)?", value=True)
 
     with col_b:
-        if protocol_choice == "BB84":
-            attack_choice = st.selectbox("Attack Model", ["Intercept-Resend", "Noisy Channel", "Photon Number Splitting"], disabled=not eve_present)
-            noise_level = st.slider("Channel Noise / Attack Strength", 0.0, 0.5, 0.1, disabled=(not eve_present or attack_choice == "Photon Number Splitting"))
-        else:
-            st.info("B92 currently supports a simplified noise-based attack model.")
-            noise_level = st.slider("Channel Noise Level", 0.0, 0.5, 0.1, disabled=not eve_present)
+        attack_choice = st.selectbox("Attack Model", ["Intercept-Resend", "Noisy Channel", "Photon Number Splitting"], disabled=not eve_present)
+        noise_level = st.slider("Channel Noise / Attack Strength", 0.0, 0.5, 0.1, disabled=(not eve_present or attack_choice == "Photon Number Splitting"))
 
     if st.button("Run Simulation"):
         backend = get_backend(use_real_hardware, ibm_api_key)
@@ -118,23 +114,45 @@ with tab1:
                 "encoded_qubits": encoded_qubits
             }
         else:
-            st.info("Running B92 simulation...")
-            results = run_b92(n, eve_present, noise_level)
-            qber = results["qber"]
+            protocol = B92Protocol()
+            alice_bits = protocol.generate_bits(n)
+            encoded_qubits = protocol.encode(alice_bits)
+
+            st.info(f"Running B92 simulation with {attack_choice if eve_present else 'no'} intervention...")
+
+            if eve_present:
+                if attack_choice == "Intercept-Resend":
+                    attack = InterceptResend()
+                elif attack_choice == "Noisy Channel":
+                    attack = NoisyChannel(noise_level)
+                else:
+                    attack = PhotonNumberSplitting()
+                intercepted_qubits = attack.apply(encoded_qubits, backend)
+            else:
+                intercepted_qubits = encoded_qubits
+
+            bob_bases = protocol.generate_bases(n)
+            bob_results = protocol.measure(intercepted_qubits, bob_bases, backend)
+
+            key_a, key_b, sifted_indices = protocol.sift(alice_bits, bob_bases, bob_results)
+            qber = calculate_qber(key_a, key_b)
             is_secure, security_status = analyze_security(qber)
 
+            # Generate error report for B92
+            report = generate_error_report(alice_bits, bob_results, ["B92"] * n, bob_bases, key_a, key_b)
+
             viz_data = {
-                "alice_bits": results["alice_bits"],
-                "alice_bases": results["alice_bases"],
-                "bob_bases": results["bob_bases"],
-                "bob_results": results["bob_results"],
-                "key_a": results["key_a"],
-                "key_b": results["key_b"],
+                "alice_bits": alice_bits,
+                "alice_bases": ["B92"] * n,
+                "bob_bases": bob_bases,
+                "bob_results": bob_results,
+                "key_a": key_a,
+                "key_b": key_b,
                 "qber": qber,
-                "report": results.get("report"),
+                "report": report,
                 "is_secure": is_secure,
                 "security_status": security_status,
-                "encoded_qubits": None # B92 doesn't return circuits currently
+                "encoded_qubits": encoded_qubits
             }
 
         st.subheader("📬 Sifted Key Result")
@@ -148,21 +166,25 @@ with tab1:
             st.success("✅ Low QBER. Communication likely secure.")
 
         # Real-time Circuit Display
-        if protocol_choice == "BB84":
-            st.subheader("🛠️ Quantum Circuit (First Qubit)")
-            st.pyplot(draw_circuit_visual(viz_data['encoded_qubits'][0]))
+        st.subheader("🛠️ Quantum Circuit (First Qubit)")
+        st.pyplot(draw_circuit_visual(viz_data['encoded_qubits'][0]))
 
-            with st.expander("🛠️ Quantum Circuit Preview (First 5 Qubits)"):
-                for i in range(min(5, n)):
-                    st.write(f"Qubit {i} (Basis: {viz_data['alice_bases'][i]}, Bit: {viz_data['alice_bits'][i]})")
-                    st.pyplot(viz_data['encoded_qubits'][i].draw('mpl'))
+        with st.expander("🛠️ Quantum Circuit Preview (First 5 Qubits)"):
+            for i in range(min(5, n)):
+                label = f" (Basis: {viz_data['alice_bases'][i]}, Bit: {viz_data['alice_bits'][i]})" if protocol_choice == "BB84" else f" (Bit: {viz_data['alice_bits'][i]})"
+                st.write(f"Qubit {i}{label}")
+                st.pyplot(viz_data['encoded_qubits'][i].draw('mpl'))
 
         if viz_data['report']:
             st.subheader("📊 Detailed Error Analysis")
             col1, col2, col3 = st.columns(3)
-            col1.metric("Basis Matching Efficiency", f"{viz_data['report']['basis_match_efficiency']:.1f}%")
-            col2.metric("Z-Basis Error Rate", f"{viz_data['report']['z_error_rate']*100:.1f}%")
-            col3.metric("X-Basis Error Rate", f"{viz_data['report']['x_error_rate']*100:.1f}%")
+            col1.metric("Sifting Efficiency", f"{viz_data['report']['basis_match_efficiency']:.1f}%")
+            if protocol_choice == "BB84":
+                col2.metric("Z-Basis Error Rate", f"{viz_data['report']['z_error_rate']*100:.1f}%")
+                col3.metric("X-Basis Error Rate", f"{viz_data['report']['x_error_rate']*100:.1f}%")
+            else:
+                col2.metric("Total Qubits", viz_data['report']['total_qubits'])
+                col3.metric("Sifted Length", viz_data['report']['sifted_length'])
 
         st.subheader("🔍 Basis Matching")
         basis_matching_visual(viz_data['alice_bases'][:20], viz_data['bob_bases'][:20])
