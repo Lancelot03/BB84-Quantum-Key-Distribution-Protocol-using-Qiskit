@@ -1,7 +1,7 @@
 import random
 from abc import ABC, abstractmethod
 from qiskit import QuantumCircuit, transpile
-from qiskit_aer import Aer
+from qiskit_aer import AerSimulator
 
 class Attack(ABC):
     @abstractmethod
@@ -12,7 +12,7 @@ class Attack(ABC):
 class InterceptResend(Attack):
     def apply(self, circuits, backend=None):
         if backend is None:
-            backend = Aer.get_backend('qasm_simulator')
+            backend = AerSimulator()
 
         new_circuits = []
         eve_bases = [random.choice(['Z', 'X']) for _ in range(len(circuits))]
@@ -42,7 +42,14 @@ class NoisyChannel(Attack):
         for qc in circuits:
             noisy_qc = qc.copy()
             if random.random() < self.noise_level:
-                noisy_qc.x(0) # Bit flip noise
+                # Apply random Pauli noise (X, Y, or Z flip)
+                noise_type = random.choice(['X', 'Y', 'Z'])
+                if noise_type == 'X':
+                    noisy_qc.x(0)
+                elif noise_type == 'Y':
+                    noisy_qc.y(0)
+                else:
+                    noisy_qc.z(0)
             new_circuits.append(noisy_qc)
         return new_circuits
 
