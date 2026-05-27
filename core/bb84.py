@@ -1,6 +1,6 @@
 import random
 from qiskit import QuantumCircuit, transpile
-from qiskit_aer import Aer
+from qiskit_aer import AerSimulator
 from core.protocol import QKDProtocol
 
 class BB84Protocol(QKDProtocol):
@@ -14,6 +14,7 @@ class BB84Protocol(QKDProtocol):
         circuits = []
         for bit, base in zip(bits, bases):
             qc = QuantumCircuit(1, 1)
+            qc.metadata = {'bit': bit, 'base': base}
             if bit == 1:
                 qc.x(0)
             if base == 'X':
@@ -23,19 +24,23 @@ class BB84Protocol(QKDProtocol):
 
     def measure(self, circuits, bases, backend=None):
         if backend is None:
-            backend = Aer.get_backend('qasm_simulator')
+            backend = AerSimulator()
 
-        results = []
+        # Prepare measurement circuits
+        meas_circuits = []
         for i, qc in enumerate(circuits):
-            new_qc = qc.copy()
+            mqc = qc.copy()
             if bases[i] == 'X':
-                new_qc.h(0)
-            new_qc.measure(0, 0)
-            t_qc = transpile(new_qc, backend)
-            job = backend.run(t_qc, shots=1, memory=True)
-            result = int(job.result().get_memory()[0])
-            results.append(result)
-        return results
+                mqc.h(0)
+            mqc.measure(0, 0)
+            meas_circuits.append(mqc)
+
+        # Batch transpile and run
+        t_circuits = transpile(meas_circuits, backend)
+        job = backend.run(t_circuits, shots=1, memory=True)
+        result = job.result()
+
+        return [int(result.get_memory(i)[0]) for i in range(len(circuits))]
 
     def sift(self, alice_bases, bob_bases, alice_bits, bob_bits):
         sifted_a, sifted_b = [], []
