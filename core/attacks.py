@@ -14,19 +14,24 @@ class InterceptResend(Attack):
         if backend is None:
             backend = Aer.get_backend('qasm_simulator')
 
-        new_circuits = []
         eve_bases = [random.choice(['Z', 'X']) for _ in range(len(circuits))]
+        eve_meas_circuits = []
         for i, qc in enumerate(circuits):
             eve_circuit = qc.copy()
             if eve_bases[i] == 'X':
                 eve_circuit.h(0)
             eve_circuit.measure(0, 0)
-            t_qc = transpile(eve_circuit, backend)
-            job = backend.run(t_qc, shots=1, memory=True)
-            result = int(job.result().get_memory()[0])
+            eve_meas_circuits.append(eve_circuit)
 
+        t_circs = transpile(eve_meas_circuits, backend)
+        job = backend.run(t_circs, shots=1, memory=True)
+        result = job.result()
+        eve_results = [int(result.get_memory(i)[0]) for i in range(len(eve_meas_circuits))]
+
+        new_circuits = []
+        for i, res in enumerate(eve_results):
             re_qc = QuantumCircuit(1, 1)
-            if result == 1:
+            if res == 1:
                 re_qc.x(0)
             if eve_bases[i] == 'X':
                 re_qc.h(0)
@@ -42,7 +47,14 @@ class NoisyChannel(Attack):
         for qc in circuits:
             noisy_qc = qc.copy()
             if random.random() < self.noise_level:
-                noisy_qc.x(0) # Bit flip noise
+                # Depolarizing noise model: X, Y, or Z with equal probability
+                noise_type = random.choice(['X', 'Y', 'Z'])
+                if noise_type == 'X':
+                    noisy_qc.x(0)
+                elif noise_type == 'Y':
+                    noisy_qc.y(0)
+                else:
+                    noisy_qc.z(0)
             new_circuits.append(noisy_qc)
         return new_circuits
 
