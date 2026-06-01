@@ -17,28 +17,33 @@ def generate_error_report(alice_bits, bob_results, alice_bases, bob_bases, sifte
     total_qubits = len(alice_bits)
     sifted_length = len(sifted_alice)
 
-    # Efficiency of basis matching
+    # Efficiency
     basis_match_efficiency = (sifted_length / total_qubits) * 100 if total_qubits > 0 else 0
 
     # QBER
     qber = calculate_qber(sifted_alice, sifted_bob)
 
-    # Analyze errors per basis
+    # Analyze errors per basis (relevant for BB84)
     z_errors = 0
     z_total = 0
     x_errors = 0
     x_total = 0
 
-    for i in range(total_qubits):
-        if alice_bases[i] == bob_bases[i]:
-            if alice_bases[i] == 'Z':
-                z_total += 1
-                if alice_bits[i] != bob_results[i]:
-                    z_errors += 1
-            elif alice_bases[i] == 'X':
-                x_total += 1
-                if alice_bits[i] != bob_results[i]:
-                    x_errors += 1
+    # For B92, alice_bases is usually filled with "B92"
+    if "B92" in alice_bases:
+        # B92 specific reporting could be added here if needed
+        pass
+    else:
+        for i in range(total_qubits):
+            if alice_bases[i] == bob_bases[i]:
+                if alice_bases[i] == 'Z':
+                    z_total += 1
+                    if alice_bits[i] != bob_results[i]:
+                        z_errors += 1
+                elif alice_bases[i] == 'X':
+                    x_total += 1
+                    if alice_bits[i] != bob_results[i]:
+                        x_errors += 1
 
     z_error_rate = (z_errors / z_total) if z_total > 0 else 0
     x_error_rate = (x_errors / x_total) if x_total > 0 else 0

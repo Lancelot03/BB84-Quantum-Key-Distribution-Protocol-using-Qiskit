@@ -14,23 +14,33 @@ class InterceptResend(Attack):
         if backend is None:
             backend = Aer.get_backend('qasm_simulator')
 
-        new_circuits = []
-        eve_bases = [random.choice(['Z', 'X']) for _ in range(len(circuits))]
-        for i, qc in enumerate(circuits):
-            eve_circuit = qc.copy()
-            if eve_bases[i] == 'X':
-                eve_circuit.h(0)
-            eve_circuit.measure(0, 0)
-            t_qc = transpile(eve_circuit, backend)
-            job = backend.run(t_qc, shots=1, memory=True)
-            result = int(job.result().get_memory()[0])
+        n = len(circuits)
+        eve_bases = [random.choice(['Z', 'X']) for _ in range(n)]
 
+        # Prepare circuits for Eve's measurement
+        eve_measure_circuits = []
+        for i, qc in enumerate(circuits):
+            eve_qc = qc.copy()
+            if eve_bases[i] == 'X':
+                eve_qc.h(0)
+            eve_qc.measure(0, 0)
+            eve_measure_circuits.append(eve_qc)
+
+        # Batch Eve's measurement
+        t_eve_circs = transpile(eve_measure_circuits, backend)
+        job = backend.run(t_eve_circs, shots=1, memory=True)
+        eve_results = [int(job.result().get_memory(i)[0]) for i in range(n)]
+
+        # Eve re-encodes and sends new qubits to Bob
+        new_circuits = []
+        for i in range(n):
             re_qc = QuantumCircuit(1, 1)
-            if result == 1:
+            if eve_results[i] == 1:
                 re_qc.x(0)
             if eve_bases[i] == 'X':
                 re_qc.h(0)
             new_circuits.append(re_qc)
+
         return new_circuits
 
 class NoisyChannel(Attack):
@@ -51,7 +61,7 @@ class PhotonNumberSplitting(Attack):
         new_circuits = []
         for qc in circuits:
             noisy_qc = qc.copy()
-            if random.random() < 0.02: # Very low disturbance
+            if random.random() < 0.02:
                 noisy_qc.x(0)
             new_circuits.append(noisy_qc)
         return new_circuits
