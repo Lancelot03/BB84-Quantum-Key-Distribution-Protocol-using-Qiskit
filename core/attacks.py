@@ -14,17 +14,25 @@ class InterceptResend(Attack):
         if backend is None:
             backend = Aer.get_backend('qasm_simulator')
 
-        new_circuits = []
+        # Eve measures the qubits in random bases
         eve_bases = [random.choice(['Z', 'X']) for _ in range(len(circuits))]
+        eve_measurement_circuits = []
         for i, qc in enumerate(circuits):
-            eve_circuit = qc.copy()
+            eve_qc = qc.copy()
             if eve_bases[i] == 'X':
-                eve_circuit.h(0)
-            eve_circuit.measure(0, 0)
-            t_qc = transpile(eve_circuit, backend)
-            job = backend.run(t_qc, shots=1, memory=True)
-            result = int(job.result().get_memory()[0])
+                eve_qc.h(0)
+            eve_qc.measure(0, 0)
+            eve_measurement_circuits.append(eve_qc)
 
+        # Batch measurement
+        t_eve_circuits = transpile(eve_measurement_circuits, backend)
+        job = backend.run(t_eve_circuits, shots=1, memory=True)
+        result_data = job.result()
+
+        # Resend new qubits based on results
+        new_circuits = []
+        for i in range(len(circuits)):
+            result = int(result_data.get_memory(i)[0])
             re_qc = QuantumCircuit(1, 1)
             if result == 1:
                 re_qc.x(0)
@@ -42,16 +50,24 @@ class NoisyChannel(Attack):
         for qc in circuits:
             noisy_qc = qc.copy()
             if random.random() < self.noise_level:
-                noisy_qc.x(0) # Bit flip noise
+                # Using Y-gate for basis-independent noise (applies both bit and phase flip)
+                noisy_qc.y(0)
             new_circuits.append(noisy_qc)
         return new_circuits
 
 class PhotonNumberSplitting(Attack):
+    """
+    Simulates a Photon Number Splitting (PNS) attack where Eve exploits multi-photon pulses.
+    In this simplified simulation, it introduces minor noise but allows Eve to gain info
+    without significantly increasing QBER if pulses were multi-photon.
+    """
     def apply(self, circuits, backend=None):
         new_circuits = []
         for qc in circuits:
             noisy_qc = qc.copy()
-            if random.random() < 0.02: # Very low disturbance
-                noisy_qc.x(0)
+            # PNS in real life might not introduce any error if Eve only takes the extra photon.
+            # Here we simulate some small disturbance or specific noise.
+            if random.random() < 0.05:
+                noisy_qc.y(0)
             new_circuits.append(noisy_qc)
         return new_circuits
