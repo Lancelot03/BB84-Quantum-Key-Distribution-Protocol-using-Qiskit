@@ -1,12 +1,9 @@
 import random
 from qiskit import QuantumCircuit, transpile
-from qiskit_aer import Aer
+from qiskit_aer import AerSimulator
 from core.protocol import QKDProtocol
 
 class BB84Protocol(QKDProtocol):
-    def generate_bits(self, n):
-        return [random.randint(0, 1) for _ in range(n)]
-
     def generate_bases(self, n):
         return [random.choice(['Z', 'X']) for _ in range(n)]
 
@@ -23,18 +20,24 @@ class BB84Protocol(QKDProtocol):
 
     def measure(self, circuits, bases, backend=None):
         if backend is None:
-            backend = Aer.get_backend('qasm_simulator')
+            backend = AerSimulator()
+
+        measurement_circuits = []
+        for i, qc in enumerate(circuits):
+            m_qc = qc.copy()
+            if bases[i] == 'X':
+                m_qc.h(0)
+            m_qc.measure(0, 0)
+            measurement_circuits.append(m_qc)
+
+        t_circuits = transpile(measurement_circuits, backend)
+        job = backend.run(t_circuits, shots=1, memory=True)
+        result_data = job.result()
 
         results = []
-        for i, qc in enumerate(circuits):
-            new_qc = qc.copy()
-            if bases[i] == 'X':
-                new_qc.h(0)
-            new_qc.measure(0, 0)
-            t_qc = transpile(new_qc, backend)
-            job = backend.run(t_qc, shots=1, memory=True)
-            result = int(job.result().get_memory()[0])
-            results.append(result)
+        for i in range(len(circuits)):
+            res = int(result_data.get_memory(i)[0])
+            results.append(res)
         return results
 
     def sift(self, alice_bases, bob_bases, alice_bits, bob_bits):
