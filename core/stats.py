@@ -30,7 +30,17 @@ def generate_error_report(alice_bits, bob_results, alice_bases, bob_bases, sifte
     x_total = 0
 
     for i in range(total_qubits):
-        if alice_bases[i] == bob_bases[i]:
+        if alice_bases[i] == "B92":
+            if bob_results[i] == 1: # Conclusive result
+                if bob_bases[i] == 'Z':
+                    z_total += 1
+                    if alice_bits[i] != 1:
+                        z_errors += 1
+                elif bob_bases[i] == 'X':
+                    x_total += 1
+                    if alice_bits[i] != 0:
+                        x_errors += 1
+        elif alice_bases[i] == bob_bases[i]:
             if alice_bases[i] == 'Z':
                 z_total += 1
                 if alice_bits[i] != bob_results[i]:

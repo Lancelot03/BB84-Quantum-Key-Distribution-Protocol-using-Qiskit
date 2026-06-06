@@ -25,16 +25,19 @@ class BB84Protocol(QKDProtocol):
         if backend is None:
             backend = Aer.get_backend('qasm_simulator')
 
-        results = []
+        measurement_circuits = []
         for i, qc in enumerate(circuits):
             new_qc = qc.copy()
             if bases[i] == 'X':
                 new_qc.h(0)
             new_qc.measure(0, 0)
-            t_qc = transpile(new_qc, backend)
-            job = backend.run(t_qc, shots=1, memory=True)
-            result = int(job.result().get_memory()[0])
-            results.append(result)
+            measurement_circuits.append(new_qc)
+
+        t_circuits = transpile(measurement_circuits, backend)
+        job = backend.run(t_circuits, shots=1, memory=True)
+        results_obj = job.result()
+
+        results = [int(results_obj.get_memory(i)[0]) for i in range(len(circuits))]
         return results
 
     def sift(self, alice_bases, bob_bases, alice_bits, bob_bits):
