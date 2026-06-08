@@ -14,17 +14,22 @@ class InterceptResend(Attack):
         if backend is None:
             backend = Aer.get_backend('qasm_simulator')
 
-        new_circuits = []
         eve_bases = [random.choice(['Z', 'X']) for _ in range(len(circuits))]
+        eve_circuits = []
         for i, qc in enumerate(circuits):
-            eve_circuit = qc.copy()
+            eve_qc = qc.copy()
             if eve_bases[i] == 'X':
-                eve_circuit.h(0)
-            eve_circuit.measure(0, 0)
-            t_qc = transpile(eve_circuit, backend)
-            job = backend.run(t_qc, shots=1, memory=True)
-            result = int(job.result().get_memory()[0])
+                eve_qc.h(0)
+            eve_qc.measure(0, 0)
+            eve_circuits.append(eve_qc)
 
+        t_circs = transpile(eve_circuits, backend)
+        job = backend.run(t_circs, shots=1, memory=True)
+        result_obj = job.result()
+        eve_results = [int(result_obj.get_memory(i)[0]) for i in range(len(circuits))]
+
+        new_circuits = []
+        for i, result in enumerate(eve_results):
             re_qc = QuantumCircuit(1, 1)
             if result == 1:
                 re_qc.x(0)
@@ -42,7 +47,8 @@ class NoisyChannel(Attack):
         for qc in circuits:
             noisy_qc = qc.copy()
             if random.random() < self.noise_level:
-                noisy_qc.x(0) # Bit flip noise
+                # Use Y-gate for basis-independent noise in BB84
+                noisy_qc.y(0)
             new_circuits.append(noisy_qc)
         return new_circuits
 
