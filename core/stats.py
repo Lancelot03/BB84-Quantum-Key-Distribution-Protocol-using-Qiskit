@@ -17,7 +17,7 @@ def generate_error_report(alice_bits, bob_results, alice_bases, bob_bases, sifte
     total_qubits = len(alice_bits)
     sifted_length = len(sifted_alice)
 
-    # Efficiency of basis matching
+    # Efficiency of basis matching or conclusive results
     basis_match_efficiency = (sifted_length / total_qubits) * 100 if total_qubits > 0 else 0
 
     # QBER
@@ -30,7 +30,8 @@ def generate_error_report(alice_bits, bob_results, alice_bases, bob_bases, sifte
     x_total = 0
 
     for i in range(total_qubits):
-        if alice_bases[i] == bob_bases[i]:
+        # BB84 logic: Bases match
+        if alice_bases[i] == bob_bases[i] and alice_bases[i] in ['Z', 'X']:
             if alice_bases[i] == 'Z':
                 z_total += 1
                 if alice_bits[i] != bob_results[i]:
@@ -38,6 +39,18 @@ def generate_error_report(alice_bits, bob_results, alice_bases, bob_bases, sifte
             elif alice_bases[i] == 'X':
                 x_total += 1
                 if alice_bits[i] != bob_results[i]:
+                    x_errors += 1
+        # B92 logic: Alice bits are effectively the bases (0 -> Z, 1 -> X)
+        # Bob measures in X (to detect 0) or Z (to detect 1).
+        # A bit is sifted if bob_results[i] == 1.
+        elif alice_bases[i] == "B92" and bob_results[i] == 1:
+            if bob_bases[i] == 'Z': # Bob measured in Z, Alice sent |+> (1)
+                z_total += 1 # We use Z/X counters for simplicity
+                if alice_bits[i] != 1:
+                    z_errors += 1
+            elif bob_bases[i] == 'X': # Bob measured in X, Alice sent |0> (0)
+                x_total += 1
+                if alice_bits[i] != 0:
                     x_errors += 1
 
     z_error_rate = (z_errors / z_total) if z_total > 0 else 0

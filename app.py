@@ -7,8 +7,7 @@ except ImportError:
     QiskitRuntimeService = None
 import matplotlib.pyplot as plt
 from visuals import bloch_sphere, photon_transmission, basis_matching_visual, draw_circuit_visual
-from core import BB84Protocol, InterceptResend, NoisyChannel, PhotonNumberSplitting, calculate_qber, analyze_security, generate_error_report
-from core.b92 import run_b92
+from core import BB84Protocol, B92Protocol, InterceptResend, NoisyChannel, PhotonNumberSplitting, calculate_qber, analyze_security, generate_error_report
 
 # --- Quantum Logic Functions ---
 
@@ -80,62 +79,53 @@ with tab1:
             alice_bits = protocol.generate_bits(n)
             alice_bases = protocol.generate_bases(n)
             encoded_qubits = protocol.encode(alice_bits, alice_bases)
-
             st.info(f"Running BB84 simulation with {attack_choice if eve_present else 'no'} intervention...")
+        else:
+            protocol = B92Protocol()
+            alice_bits = protocol.generate_bits(n)
+            alice_bases = ["B92"] * n
+            encoded_qubits = protocol.encode(alice_bits)
+            attack_choice = "Noisy Channel" # B92 currently uses noise for Eve
+            st.info(f"Running B92 simulation...")
 
-            if eve_present:
+        if eve_present:
+            if protocol_choice == "BB84":
                 if attack_choice == "Intercept-Resend":
                     attack = InterceptResend()
                 elif attack_choice == "Noisy Channel":
                     attack = NoisyChannel(noise_level)
                 else:
                     attack = PhotonNumberSplitting()
-                intercepted_qubits = attack.apply(encoded_qubits, backend)
             else:
-                intercepted_qubits = encoded_qubits
+                attack = NoisyChannel(noise_level)
 
-            bob_bases = protocol.generate_bases(n)
-            bob_results = protocol.measure(intercepted_qubits, bob_bases, backend)
-
-            key_a, key_b, sifted_indices = protocol.sift(alice_bases, bob_bases, alice_bits, bob_results)
-            qber = calculate_qber(key_a, key_b)
-            is_secure, security_status = analyze_security(qber)
-
-            report = generate_error_report(alice_bits, bob_results, alice_bases, bob_bases, key_a, key_b)
-
-            # For visualization
-            viz_data = {
-                "alice_bits": alice_bits,
-                "alice_bases": alice_bases,
-                "bob_bases": bob_bases,
-                "bob_results": bob_results,
-                "key_a": key_a,
-                "key_b": key_b,
-                "qber": qber,
-                "report": report,
-                "is_secure": is_secure,
-                "security_status": security_status,
-                "encoded_qubits": encoded_qubits
-            }
+            intercepted_qubits = attack.apply(encoded_qubits, backend)
         else:
-            st.info("Running B92 simulation...")
-            results = run_b92(n, eve_present, noise_level)
-            qber = results["qber"]
-            is_secure, security_status = analyze_security(qber)
+            intercepted_qubits = encoded_qubits
 
-            viz_data = {
-                "alice_bits": results["alice_bits"],
-                "alice_bases": results["alice_bases"],
-                "bob_bases": results["bob_bases"],
-                "bob_results": results["bob_results"],
-                "key_a": results["key_a"],
-                "key_b": results["key_b"],
-                "qber": qber,
-                "report": results.get("report"),
-                "is_secure": is_secure,
-                "security_status": security_status,
-                "encoded_qubits": None # B92 doesn't return circuits currently
-            }
+        bob_bases = protocol.generate_bases(n)
+        bob_results = protocol.measure(intercepted_qubits, bob_bases, backend)
+
+        key_a, key_b, sifted_indices = protocol.sift(alice_bases, bob_bases, alice_bits, bob_results)
+        qber = calculate_qber(key_a, key_b)
+        is_secure, security_status = analyze_security(qber)
+
+        report = generate_error_report(alice_bits, bob_results, alice_bases, bob_bases, key_a, key_b)
+
+        # For visualization
+        viz_data = {
+            "alice_bits": alice_bits,
+            "alice_bases": alice_bases,
+            "bob_bases": bob_bases,
+            "bob_results": bob_results,
+            "key_a": key_a,
+            "key_b": key_b,
+            "qber": qber,
+            "report": report,
+            "is_secure": is_secure,
+            "security_status": security_status,
+            "encoded_qubits": encoded_qubits
+        }
 
         st.subheader("📬 Sifted Key Result")
         st.text(f"Alice's Key: {''.join(map(str, viz_data['key_a']))}")
@@ -148,14 +138,19 @@ with tab1:
             st.success("✅ Low QBER. Communication likely secure.")
 
         # Real-time Circuit Display
-        if protocol_choice == "BB84":
-            st.subheader("🛠️ Quantum Circuit (First Qubit)")
-            st.pyplot(draw_circuit_visual(viz_data['encoded_qubits'][0]))
+        st.subheader("🛠️ Quantum Circuit (First Qubit)")
+        st.pyplot(draw_circuit_visual(viz_data['encoded_qubits'][0]))
 
-            with st.expander("🛠️ Quantum Circuit Preview (First 5 Qubits)"):
-                for i in range(min(5, n)):
-                    st.write(f"Qubit {i} (Basis: {viz_data['alice_bases'][i]}, Bit: {viz_data['alice_bits'][i]})")
-                    st.pyplot(viz_data['encoded_qubits'][i].draw('mpl'))
+        with st.expander("🛠️ Quantum Circuit Preview (First 5 Qubits)"):
+            for i in range(min(5, n)):
+                basis_label = viz_data['alice_bases'][i]
+                if basis_label == "B92":
+                    # For B92, show the state directly
+                    state = "|0⟩" if viz_data['alice_bits'][i] == 0 else "|+⟩"
+                    st.write(f"Qubit {i} (State: {state}, Bit: {viz_data['alice_bits'][i]})")
+                else:
+                    st.write(f"Qubit {i} (Basis: {basis_label}, Bit: {viz_data['alice_bits'][i]})")
+                st.pyplot(viz_data['encoded_qubits'][i].draw('mpl'))
 
         if viz_data['report']:
             st.subheader("📊 Detailed Error Analysis")

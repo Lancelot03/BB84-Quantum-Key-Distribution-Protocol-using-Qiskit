@@ -1,7 +1,7 @@
 import random
 from abc import ABC, abstractmethod
 from qiskit import QuantumCircuit, transpile
-from qiskit_aer import Aer
+from qiskit_aer import AerSimulator
 
 class Attack(ABC):
     @abstractmethod
@@ -12,21 +12,28 @@ class Attack(ABC):
 class InterceptResend(Attack):
     def apply(self, circuits, backend=None):
         if backend is None:
-            backend = Aer.get_backend('qasm_simulator')
+            backend = AerSimulator()
+
+        n = len(circuits)
+        eve_bases = [random.choice(['Z', 'X']) for _ in range(n)]
+        eve_circuits = []
+        for i, qc in enumerate(circuits):
+            eve_qc = qc.copy()
+            if eve_bases[i] == 'X':
+                eve_qc.h(0)
+            eve_qc.measure(0, 0)
+            eve_circuits.append(eve_qc)
+
+        t_circs = transpile(eve_circuits, backend)
+        job = backend.run(t_circs, shots=1, memory=True)
+        job_result = job.result()
+
+        results = [int(job_result.get_memory(i)[0]) for i in range(n)]
 
         new_circuits = []
-        eve_bases = [random.choice(['Z', 'X']) for _ in range(len(circuits))]
-        for i, qc in enumerate(circuits):
-            eve_circuit = qc.copy()
-            if eve_bases[i] == 'X':
-                eve_circuit.h(0)
-            eve_circuit.measure(0, 0)
-            t_qc = transpile(eve_circuit, backend)
-            job = backend.run(t_qc, shots=1, memory=True)
-            result = int(job.result().get_memory()[0])
-
+        for i in range(n):
             re_qc = QuantumCircuit(1, 1)
-            if result == 1:
+            if results[i] == 1:
                 re_qc.x(0)
             if eve_bases[i] == 'X':
                 re_qc.h(0)
@@ -42,7 +49,7 @@ class NoisyChannel(Attack):
         for qc in circuits:
             noisy_qc = qc.copy()
             if random.random() < self.noise_level:
-                noisy_qc.x(0) # Bit flip noise
+                noisy_qc.y(0) # Basis-independent noise (bit and phase flip)
             new_circuits.append(noisy_qc)
         return new_circuits
 
