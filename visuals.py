@@ -1,4 +1,21 @@
 import streamlit.components.v1 as components
+import numpy as np
+from qiskit.quantum_info import Statevector
+
+def get_bloch_coordinates(qc):
+    """
+    Computes Bloch sphere coordinates (x, y, z) for a single-qubit circuit.
+    """
+    state = Statevector.from_instruction(qc)
+    # a, b are coefficients of |0> and |1>
+    a = state.data[0]
+    b = state.data[1]
+
+    x = 2 * np.real(np.conj(a) * b)
+    y = 2 * np.imag(np.conj(a) * b)
+    z = np.abs(a)**2 - np.abs(b)**2
+
+    return [float(x), float(y), float(z)]
 
 def bloch_sphere(state_vector=[1, 0, 0], height=500):
     """

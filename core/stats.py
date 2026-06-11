@@ -10,7 +10,7 @@ def analyze_security(qber, threshold=0.11):
     is_secure = qber <= threshold
     return is_secure, "Secure" if is_secure else "Compromised"
 
-def generate_error_report(alice_bits, bob_results, alice_bases, bob_bases, sifted_alice, sifted_bob):
+def generate_error_report(alice_bits, bob_results, alice_bases, bob_bases, sifted_alice, sifted_bob, qber):
     """
     Generate a detailed error analysis report.
     Supports both BB84 and B92 logic.
@@ -20,9 +20,6 @@ def generate_error_report(alice_bits, bob_results, alice_bases, bob_bases, sifte
 
     # Efficiency of basis matching (or conclusive results in B92)
     basis_match_efficiency = (sifted_length / total_qubits) * 100 if total_qubits > 0 else 0
-
-    # QBER
-    qber = calculate_qber(sifted_alice, sifted_bob)
 
     # Analyze errors per basis
     z_errors = 0
@@ -37,8 +34,6 @@ def generate_error_report(alice_bits, bob_results, alice_bases, bob_bases, sifte
         if is_b92:
             # B92 Logic: Sifted only if bob_results[i] == 1
             if bob_results[i] == 1:
-                # If Bob measured 1 in Z, Alice must have sent bit 1
-                # If Bob measured 1 in X, Alice must have sent bit 0
                 if bob_bases[i] == 'Z':
                     z_total += 1
                     if alice_bits[i] != 1:
@@ -62,6 +57,16 @@ def generate_error_report(alice_bits, bob_results, alice_bases, bob_bases, sifte
     z_error_rate = (z_errors / z_total) if z_total > 0 else 0
     x_error_rate = (x_errors / x_total) if x_total > 0 else 0
 
+    # Enhanced security analysis
+    # Estimated information Eve gained.
+    eve_info_gain = min(1.0, 4 * qber) if not is_b92 else min(1.0, 2 * qber)
+
+    security_note = "Low risk."
+    if qber > 0.11:
+        security_note = "High risk! Eve may have significant information."
+    elif qber > 0.05:
+        security_note = "Moderate risk. Possible eavesdropping or high noise."
+
     return {
         "total_qubits": total_qubits,
         "sifted_length": sifted_length,
@@ -70,5 +75,7 @@ def generate_error_report(alice_bits, bob_results, alice_bases, bob_bases, sifte
         "z_error_rate": z_error_rate,
         "x_error_rate": x_error_rate,
         "z_total": z_total,
-        "x_total": x_total
+        "x_total": x_total,
+        "eve_info_gain": eve_info_gain,
+        "security_note": security_note
     }

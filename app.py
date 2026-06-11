@@ -6,8 +6,8 @@ try:
 except ImportError:
     QiskitRuntimeService = None
 import matplotlib.pyplot as plt
-from visuals import bloch_sphere, photon_transmission, basis_matching_visual, draw_circuit_visual
-from core import BB84Protocol, B92Protocol, InterceptResend, NoisyChannel, PhotonNumberSplitting, calculate_qber, analyze_security, generate_error_report
+from visuals import bloch_sphere, photon_transmission, basis_matching_visual, draw_circuit_visual, get_bloch_coordinates
+from core import BB84Protocol, B92Protocol, InterceptResend, NoisyChannel, PhotonNumberSplitting, SimulationEngine
 
 # --- Quantum Logic Functions ---
 
@@ -26,6 +26,8 @@ def get_backend(use_hardware=False, api_key=""):
 
 # Plotting Functions
 def plot_bit_differences(key_a, key_b):
+    if not key_a or not key_b:
+        return None
     diffs = [int(a != b) for a, b in zip(key_a, key_b)]
     fig, ax = plt.subplots(figsize=(10, 2))
     ax.plot(diffs, marker='o', color='red', label='Mismatch')
@@ -71,19 +73,10 @@ with tab1:
         backend = get_backend(use_real_hardware, ibm_api_key)
 
         # Initialize Protocol
-        if protocol_choice == "BB84":
-            protocol = BB84Protocol()
-        else:
-            protocol = B92Protocol()
+        protocol = BB84Protocol() if protocol_choice == "BB84" else B92Protocol()
 
-        # Alice generates and encodes
-        alice_bits = protocol.generate_bits(n)
-        alice_bases = protocol.generate_bases(n) if protocol_choice == "BB84" else ["B92"] * n
-        encoded_qubits = protocol.encode(alice_bits, alice_bases)
-
-        st.info(f"Running {protocol_choice} simulation with {attack_choice if eve_present else 'no'} intervention...")
-
-        # Eve Attacks
+        # Initialize Attack
+        attack = None
         if eve_present:
             if attack_choice == "Intercept-Resend":
                 attack = InterceptResend()
@@ -91,35 +84,17 @@ with tab1:
                 attack = NoisyChannel(noise_level)
             else:
                 attack = PhotonNumberSplitting()
-            intercepted_qubits = attack.apply(encoded_qubits, backend)
-        else:
-            intercepted_qubits = encoded_qubits
 
-        # Bob Measures
-        bob_bases = protocol.generate_bases(n)
-        bob_results = protocol.measure(intercepted_qubits, bob_bases, backend)
+        # Initialize and Run Engine
+        engine = SimulationEngine(protocol, attack, backend)
 
-        # Sifting and Error Analysis
-        key_a, key_b, sifted_indices = protocol.sift(alice_bases, bob_bases, alice_bits, bob_results)
-        qber = calculate_qber(key_a, key_b)
-        is_secure, security_status = analyze_security(qber)
+        with st.status("Running Quantum Simulation...", expanded=True) as status:
+            # Simple callback that matches SimulationEngine's call
+            def status_callback(msg):
+                 status.update(label=msg)
 
-        report = generate_error_report(alice_bits, bob_results, alice_bases, bob_bases, key_a, key_b)
-
-        # Visualization Data
-        viz_data = {
-            "alice_bits": alice_bits,
-            "alice_bases": alice_bases,
-            "bob_bases": bob_bases,
-            "bob_results": bob_results,
-            "key_a": key_a,
-            "key_b": key_b,
-            "qber": qber,
-            "report": report,
-            "is_secure": is_secure,
-            "security_status": security_status,
-            "encoded_qubits": encoded_qubits
-        }
+            viz_data = engine.run(n, callback=status_callback)
+            status.update(label="Simulation Complete!", state="complete", expanded=False)
 
         st.subheader("📬 Sifted Key Result")
         st.text(f"Alice's Key: {''.join(map(str, viz_data['key_a']))}")
@@ -131,11 +106,37 @@ with tab1:
         else:
             st.success("✅ Low QBER. Communication likely secure.")
 
-        # Real-time Circuit Display
-        st.subheader("🛠️ Quantum Circuit (First Qubit)")
-        st.pyplot(draw_circuit_visual(viz_data['encoded_qubits'][0]))
+        # Real-time Qubit State Visualization
+        st.subheader("🔮 Qubit State Evolution (First Qubit)")
+        vcol1, vcol2, vcol3 = st.columns(3)
 
-        with st.expander("🛠️ Quantum Circuit Preview (First 5 Qubits)"):
+        with vcol1:
+            st.write("**Alice's Encoding**")
+            coords = get_bloch_coordinates(viz_data['encoded_qubits'][0])
+            bloch_sphere(state_vector=coords, height=300)
+            st.pyplot(draw_circuit_visual(viz_data['encoded_qubits'][0]))
+
+        with vcol2:
+            st.write("**Eve's Intervention**" if eve_present else "**Channel (Vacuum)**")
+            # For visualization, we can show the state after Eve or the same as Alice
+            coords = get_bloch_coordinates(viz_data['intercepted_qubits'][0])
+            bloch_sphere(state_vector=coords, height=300)
+            if eve_present:
+                 st.pyplot(draw_circuit_visual(viz_data['intercepted_qubits'][0]))
+            else:
+                 st.write("No changes in vacuum.")
+
+        with vcol3:
+            st.write("**Bob's Measurement Basis**")
+            # Show Bob's basis as a circuit for visualization
+            bob_qc = viz_data['intercepted_qubits'][0].copy()
+            if viz_data['bob_bases'][0] == 'X':
+                bob_qc.h(0)
+            coords = get_bloch_coordinates(bob_qc)
+            bloch_sphere(state_vector=coords, height=300)
+            st.write(f"Measured: {viz_data['bob_results'][0]}")
+
+        with st.expander("🛠️ Detailed Circuit Preview (First 5 Qubits)"):
             for i in range(min(5, n)):
                 st.write(f"Qubit {i} (Basis: {viz_data['alice_bases'][i]}, Bit: {viz_data['alice_bits'][i]})")
                 st.pyplot(viz_data['encoded_qubits'][i].draw('mpl'))
@@ -147,11 +148,16 @@ with tab1:
             col2.metric("Z-Basis Error Rate", f"{viz_data['report']['z_error_rate']*100:.1f}%")
             col3.metric("X-Basis Error Rate", f"{viz_data['report']['x_error_rate']*100:.1f}%")
 
+            if 'eve_info_gain' in viz_data['report']:
+                 st.info(f"🛡️ Security Note: {viz_data['report']['security_note']}")
+
         st.subheader("🔍 Basis Matching")
         basis_matching_visual(viz_data['alice_bases'][:20], viz_data['bob_bases'][:20])
 
         st.subheader("🔍 Bit Differences")
-        st.pyplot(plot_bit_differences(viz_data['key_a'], viz_data['key_b']))
+        fig_diff = plot_bit_differences(viz_data['key_a'], viz_data['key_b'])
+        if fig_diff:
+            st.pyplot(fig_diff)
 
         st.subheader("📊 QBER Distribution")
         st.pyplot(plot_qber_bar(viz_data['qber']))
