@@ -1,4 +1,25 @@
 import streamlit.components.v1 as components
+import numpy as np
+from qiskit.quantum_info import Statevector
+
+def get_bloch_coordinates(qc):
+    """
+    Calculate the [x, y, z] coordinates for the Bloch sphere from a quantum circuit.
+    Uses Statevector to extract the state and calculates the expectation values of X, Y, and Z.
+    """
+    state = Statevector.from_instruction(qc)
+    # rho = |psi><psi|
+    # x = Tr(rho * X), y = Tr(rho * Y), z = Tr(rho * Z)
+    # For a single qubit state [a, b]:
+    # x = 2 * Re(a * conj(b))
+    # y = 2 * Im(conj(a) * b)
+    # z = |a|^2 - |b|^2
+    # But Qiskit Statevector has expectation_value method
+    from qiskit.quantum_info import Pauli
+    x = state.expectation_value(Pauli('X')).real
+    y = state.expectation_value(Pauli('Y')).real
+    z = state.expectation_value(Pauli('Z')).real
+    return [float(x), float(y), float(z)]
 
 def bloch_sphere(state_vector=[1, 0, 0], height=500):
     """
@@ -50,9 +71,6 @@ def bloch_sphere(state_vector=[1, 0, 0], height=500):
             // Axes
             const axesHelper = new THREE.AxesHelper(3);
             scene.add(axesHelper);
-
-            // Labels for axes
-            // (Simplifying for now, can add text sprites later)
 
             // State Vector
             const dir = new THREE.Vector3({state_vector[0]}, {state_vector[2]}, {state_vector[1]}); // Three.js uses Y as up, Bloch uses Z as up
@@ -157,7 +175,6 @@ def photon_transmission(n_photons=10, height=300):
     return components.html(html_code, height=height)
 
 def basis_matching_visual(alice_bases, bob_bases, height=200):
-    matches = "".join(["✅" if a == b else "❌" for a, b in zip(alice_bases, bob_bases)])
     html_code = f"""
     <!DOCTYPE html>
     <html>

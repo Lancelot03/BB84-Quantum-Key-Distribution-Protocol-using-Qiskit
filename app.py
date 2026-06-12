@@ -6,8 +6,8 @@ try:
 except ImportError:
     QiskitRuntimeService = None
 import matplotlib.pyplot as plt
-from visuals import bloch_sphere, photon_transmission, basis_matching_visual, draw_circuit_visual
-from core import BB84Protocol, B92Protocol, InterceptResend, NoisyChannel, PhotonNumberSplitting, calculate_qber, analyze_security, generate_error_report
+from visuals import bloch_sphere, photon_transmission, basis_matching_visual, draw_circuit_visual, get_bloch_coordinates
+from core import BB84Protocol, B92Protocol, InterceptResend, NoisyChannel, PhotonNumberSplitting, SimulationEngine
 
 # --- Quantum Logic Functions ---
 
@@ -76,14 +76,8 @@ with tab1:
         else:
             protocol = B92Protocol()
 
-        # Alice generates and encodes
-        alice_bits = protocol.generate_bits(n)
-        alice_bases = protocol.generate_bases(n) if protocol_choice == "BB84" else ["B92"] * n
-        encoded_qubits = protocol.encode(alice_bits, alice_bases)
-
-        st.info(f"Running {protocol_choice} simulation with {attack_choice if eve_present else 'no'} intervention...")
-
-        # Eve Attacks
+        # Initialize Attack
+        attack = None
         if eve_present:
             if attack_choice == "Intercept-Resend":
                 attack = InterceptResend()
@@ -91,35 +85,13 @@ with tab1:
                 attack = NoisyChannel(noise_level)
             else:
                 attack = PhotonNumberSplitting()
-            intercepted_qubits = attack.apply(encoded_qubits, backend)
-        else:
-            intercepted_qubits = encoded_qubits
 
-        # Bob Measures
-        bob_bases = protocol.generate_bases(n)
-        bob_results = protocol.measure(intercepted_qubits, bob_bases, backend)
+        # Run Simulation with Engine
+        engine = SimulationEngine(protocol, attack, backend)
 
-        # Sifting and Error Analysis
-        key_a, key_b, sifted_indices = protocol.sift(alice_bases, bob_bases, alice_bits, bob_results)
-        qber = calculate_qber(key_a, key_b)
-        is_secure, security_status = analyze_security(qber)
-
-        report = generate_error_report(alice_bits, bob_results, alice_bases, bob_bases, key_a, key_b)
-
-        # Visualization Data
-        viz_data = {
-            "alice_bits": alice_bits,
-            "alice_bases": alice_bases,
-            "bob_bases": bob_bases,
-            "bob_results": bob_results,
-            "key_a": key_a,
-            "key_b": key_b,
-            "qber": qber,
-            "report": report,
-            "is_secure": is_secure,
-            "security_status": security_status,
-            "encoded_qubits": encoded_qubits
-        }
+        status = st.status("Simulating QKD Protocol...", expanded=True)
+        viz_data = engine.run(n, callback=lambda msg: status.update(label=msg))
+        status.update(label="Simulation Complete!", state="complete", expanded=False)
 
         st.subheader("📬 Sifted Key Result")
         st.text(f"Alice's Key: {''.join(map(str, viz_data['key_a']))}")
@@ -131,9 +103,14 @@ with tab1:
         else:
             st.success("✅ Low QBER. Communication likely secure.")
 
-        # Real-time Circuit Display
-        st.subheader("🛠️ Quantum Circuit (First Qubit)")
-        st.pyplot(draw_circuit_visual(viz_data['encoded_qubits'][0]))
+        # Real-time Circuit Display & Bloch Sphere
+        st.subheader("🛠️ Quantum Circuit & State (First Qubit)")
+        col_c1, col_c2 = st.columns(2)
+        with col_c1:
+            st.pyplot(draw_circuit_visual(viz_data['encoded_qubits'][0]))
+        with col_c2:
+            coords = get_bloch_coordinates(viz_data['encoded_qubits'][0])
+            bloch_sphere(state_vector=coords, height=300)
 
         with st.expander("🛠️ Quantum Circuit Preview (First 5 Qubits)"):
             for i in range(min(5, n)):
@@ -142,10 +119,11 @@ with tab1:
 
         if viz_data['report']:
             st.subheader("📊 Detailed Error Analysis")
-            col1, col2, col3 = st.columns(3)
+            col1, col2, col3, col4 = st.columns(4)
             col1.metric("Sifting Efficiency", f"{viz_data['report']['basis_match_efficiency']:.1f}%")
             col2.metric("Z-Basis Error Rate", f"{viz_data['report']['z_error_rate']*100:.1f}%")
             col3.metric("X-Basis Error Rate", f"{viz_data['report']['x_error_rate']*100:.1f}%")
+            col4.metric("Eve's Info Gain", f"{viz_data['report']['eve_info_gain']*100:.1f}%")
 
         st.subheader("🔍 Basis Matching")
         basis_matching_visual(viz_data['alice_bases'][:20], viz_data['bob_bases'][:20])
