@@ -10,7 +10,7 @@ def analyze_security(qber, threshold=0.11):
     is_secure = qber <= threshold
     return is_secure, "Secure" if is_secure else "Compromised"
 
-def generate_error_report(alice_bits, bob_results, alice_bases, bob_bases, sifted_alice, sifted_bob):
+def generate_error_report(alice_bits, bob_results, alice_bases, bob_bases, sifted_alice, sifted_bob, qber):
     """
     Generate a detailed error analysis report.
     Supports both BB84 and B92 logic.
@@ -21,8 +21,9 @@ def generate_error_report(alice_bits, bob_results, alice_bases, bob_bases, sifte
     # Efficiency of basis matching (or conclusive results in B92)
     basis_match_efficiency = (sifted_length / total_qubits) * 100 if total_qubits > 0 else 0
 
-    # QBER
-    qber = calculate_qber(sifted_alice, sifted_bob)
+    # Estimate Eve's information gain (simplified educational model)
+    # In BB84 Intercept-Resend, 25% QBER -> Eve knows 50% of the bits
+    eve_info_gain = min(1.0, 2 * qber)
 
     # Analyze errors per basis
     z_errors = 0
@@ -67,6 +68,7 @@ def generate_error_report(alice_bits, bob_results, alice_bases, bob_bases, sifte
         "sifted_length": sifted_length,
         "basis_match_efficiency": basis_match_efficiency,
         "qber": qber,
+        "eve_info_gain": eve_info_gain,
         "z_error_rate": z_error_rate,
         "x_error_rate": x_error_rate,
         "z_total": z_total,

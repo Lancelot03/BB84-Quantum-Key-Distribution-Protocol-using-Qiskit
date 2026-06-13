@@ -6,8 +6,21 @@ try:
 except ImportError:
     QiskitRuntimeService = None
 import matplotlib.pyplot as plt
-from visuals import bloch_sphere, photon_transmission, basis_matching_visual, draw_circuit_visual
-from core import BB84Protocol, B92Protocol, InterceptResend, NoisyChannel, PhotonNumberSplitting, calculate_qber, analyze_security, generate_error_report
+from visuals import (
+    bloch_sphere,
+    photon_transmission,
+    basis_matching_visual,
+    draw_circuit_visual,
+    get_bloch_coordinates
+)
+from core import (
+    BB84Protocol,
+    B92Protocol,
+    InterceptResend,
+    NoisyChannel,
+    PhotonNumberSplitting,
+    SimulationEngine
+)
 
 # --- Quantum Logic Functions ---
 
@@ -76,14 +89,8 @@ with tab1:
         else:
             protocol = B92Protocol()
 
-        # Alice generates and encodes
-        alice_bits = protocol.generate_bits(n)
-        alice_bases = protocol.generate_bases(n) if protocol_choice == "BB84" else ["B92"] * n
-        encoded_qubits = protocol.encode(alice_bits, alice_bases)
-
-        st.info(f"Running {protocol_choice} simulation with {attack_choice if eve_present else 'no'} intervention...")
-
-        # Eve Attacks
+        # Initialize Attack
+        attack = None
         if eve_present:
             if attack_choice == "Intercept-Resend":
                 attack = InterceptResend()
@@ -91,35 +98,13 @@ with tab1:
                 attack = NoisyChannel(noise_level)
             else:
                 attack = PhotonNumberSplitting()
-            intercepted_qubits = attack.apply(encoded_qubits, backend)
-        else:
-            intercepted_qubits = encoded_qubits
 
-        # Bob Measures
-        bob_bases = protocol.generate_bases(n)
-        bob_results = protocol.measure(intercepted_qubits, bob_bases, backend)
+        # Initialize and Run Engine
+        engine = SimulationEngine(protocol, attack, backend)
 
-        # Sifting and Error Analysis
-        key_a, key_b, sifted_indices = protocol.sift(alice_bases, bob_bases, alice_bits, bob_results)
-        qber = calculate_qber(key_a, key_b)
-        is_secure, security_status = analyze_security(qber)
-
-        report = generate_error_report(alice_bits, bob_results, alice_bases, bob_bases, key_a, key_b)
-
-        # Visualization Data
-        viz_data = {
-            "alice_bits": alice_bits,
-            "alice_bases": alice_bases,
-            "bob_bases": bob_bases,
-            "bob_results": bob_results,
-            "key_a": key_a,
-            "key_b": key_b,
-            "qber": qber,
-            "report": report,
-            "is_secure": is_secure,
-            "security_status": security_status,
-            "encoded_qubits": encoded_qubits
-        }
+        with st.status("Initializing Quantum Simulation...") as status:
+            viz_data = engine.run(n, callback=lambda msg: status.update(label=msg))
+            status.update(label="Simulation Complete!", state="complete", expanded=False)
 
         st.subheader("📬 Sifted Key Result")
         st.text(f"Alice's Key: {''.join(map(str, viz_data['key_a']))}")
@@ -142,10 +127,11 @@ with tab1:
 
         if viz_data['report']:
             st.subheader("📊 Detailed Error Analysis")
-            col1, col2, col3 = st.columns(3)
+            col1, col2, col3, col4 = st.columns(4)
             col1.metric("Sifting Efficiency", f"{viz_data['report']['basis_match_efficiency']:.1f}%")
             col2.metric("Z-Basis Error Rate", f"{viz_data['report']['z_error_rate']*100:.1f}%")
             col3.metric("X-Basis Error Rate", f"{viz_data['report']['x_error_rate']*100:.1f}%")
+            col4.metric("Eve's Info Gain (Est.)", f"{viz_data['report']['eve_info_gain']*100:.1f}%")
 
         st.subheader("🔍 Basis Matching")
         basis_matching_visual(viz_data['alice_bases'][:20], viz_data['bob_bases'][:20])
@@ -178,18 +164,39 @@ with tab2:
         st.write("In the BB84 protocol, Alice encodes bits into qubits using two different bases: Z-basis (|0>, |1>) and X-basis (|+>, |->).")
 
         col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            st.markdown("**State |0>** (Z-basis)")
-            bloch_sphere(state_vector=[0, 0, 1], height=300)
-        with col2:
-            st.markdown("**State |1>** (Z-basis)")
-            bloch_sphere(state_vector=[0, 0, -1], height=300)
-        with col3:
-            st.markdown("**State |+>** (X-basis)")
-            bloch_sphere(state_vector=[1, 0, 0], height=300)
-        with col4:
-            st.markdown("**State |->** (X-basis)")
-            bloch_sphere(state_vector=[-1, 0, 0], height=300)
+
+        # Example states for BB84
+        from qiskit import QuantumCircuit
+        states = []
+
+        # |0>
+        qc0 = QuantumCircuit(1)
+        states.append(qc0)
+
+        # |1>
+        qc1 = QuantumCircuit(1)
+        qc1.x(0)
+        states.append(qc1)
+
+        # |+>
+        qcp = QuantumCircuit(1)
+        qcp.h(0)
+        states.append(qcp)
+
+        # |->
+        qcm = QuantumCircuit(1)
+        qcm.x(0)
+        qcm.h(0)
+        states.append(qcm)
+
+        labels = ["**State |0>** (Z-basis)", "**State |1>** (Z-basis)", "**State |+>** (X-basis)", "**State |->** (X-basis)"]
+        cols = [col1, col2, col3, col4]
+
+        for i, col in enumerate(cols):
+            with col:
+                st.markdown(labels[i])
+                coords = get_bloch_coordinates(states[i])
+                bloch_sphere(state_vector=coords, height=300)
 
         st.subheader("2. Photon Transmission")
         st.write("Alice sends qubits (photons) to Bob. If Eve is present, she might intercept and measure them, which introduces errors.")
