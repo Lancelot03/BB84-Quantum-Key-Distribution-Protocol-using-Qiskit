@@ -11,6 +11,14 @@ class QKDProtocol(ABC):
         """Generate random bases for Alice and Bob."""
         pass
 
+    def generate_alice_bases(self, n):
+        """Default: Alice uses same logic as generic bases."""
+        return self.generate_bases(n)
+
+    def generate_bob_bases(self, n):
+        """Default: Bob uses same logic as generic bases."""
+        return self.generate_bases(n)
+
     @abstractmethod
     def encode(self, bits, bases):
         """Encode bits into quantum circuits using the given bases."""

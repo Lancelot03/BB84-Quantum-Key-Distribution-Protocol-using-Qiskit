@@ -10,6 +10,12 @@ class BB84Protocol(QKDProtocol):
     def generate_bases(self, n):
         return [random.choice(['Z', 'X']) for _ in range(n)]
 
+    def generate_alice_bases(self, n):
+        return self.generate_bases(n)
+
+    def generate_bob_bases(self, n):
+        return self.generate_bases(n)
+
     def encode(self, bits, bases):
         circuits = []
         for bit, base in zip(bits, bases):
