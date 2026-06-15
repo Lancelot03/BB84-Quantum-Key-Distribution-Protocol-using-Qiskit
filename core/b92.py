@@ -5,6 +5,10 @@ from core.protocol import QKDProtocol
 from core import stats
 
 class B92Protocol(QKDProtocol):
+    @property
+    def name(self):
+        return "B92"
+
     def generate_bits(self, n):
         return [random.randint(0, 1) for _ in range(n)]
 
@@ -58,39 +62,3 @@ class B92Protocol(QKDProtocol):
                 sifted_b.append(key_b_bit)
                 indices.append(i)
         return sifted_a, sifted_b, indices
-
-def run_b92(n, eve_present, noise_level):
-    """
-    Legacy wrapper for B92 simulation.
-    """
-    protocol = B92Protocol()
-    alice_bits = protocol.generate_bits(n)
-    circuits = protocol.encode(alice_bits)
-
-    if eve_present:
-        # Simplified noise attack for legacy support
-        intercepted = []
-        for qc in circuits:
-            nqc = qc.copy()
-            if random.random() < noise_level:
-                nqc.x(0)
-            intercepted.append(nqc)
-    else:
-        intercepted = circuits
-
-    bob_bases = protocol.generate_bases(n)
-    bob_results = protocol.measure(intercepted, bob_bases)
-
-    key_a, key_b, _ = protocol.sift(None, bob_bases, alice_bits, bob_results)
-
-    qber = stats.calculate_qber(key_a, key_b)
-    return {
-        "alice_bits": alice_bits,
-        "alice_bases": ["B92"] * n,
-        "bob_bases": bob_bases,
-        "bob_results": bob_results,
-        "key_a": key_a,
-        "key_b": key_b,
-        "qber": qber,
-        "report": None
-    }
