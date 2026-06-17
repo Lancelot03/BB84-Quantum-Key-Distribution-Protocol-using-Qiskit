@@ -7,7 +7,7 @@ except ImportError:
     QiskitRuntimeService = None
 import matplotlib.pyplot as plt
 from visuals import bloch_sphere, photon_transmission, basis_matching_visual, draw_circuit_visual
-from core import BB84Protocol, B92Protocol, InterceptResend, NoisyChannel, PhotonNumberSplitting, calculate_qber, analyze_security, generate_error_report
+from core import BB84Protocol, B92Protocol, InterceptResend, NoisyChannel, PhotonNumberSplitting, SimulationEngine
 
 # --- Quantum Logic Functions ---
 
@@ -76,14 +76,8 @@ with tab1:
         else:
             protocol = B92Protocol()
 
-        # Alice generates and encodes
-        alice_bits = protocol.generate_bits(n)
-        alice_bases = protocol.generate_bases(n) if protocol_choice == "BB84" else ["B92"] * n
-        encoded_qubits = protocol.encode(alice_bits, alice_bases)
-
-        st.info(f"Running {protocol_choice} simulation with {attack_choice if eve_present else 'no'} intervention...")
-
-        # Eve Attacks
+        # Initialize Attack
+        attack = None
         if eve_present:
             if attack_choice == "Intercept-Resend":
                 attack = InterceptResend()
@@ -91,35 +85,13 @@ with tab1:
                 attack = NoisyChannel(noise_level)
             else:
                 attack = PhotonNumberSplitting()
-            intercepted_qubits = attack.apply(encoded_qubits, backend)
-        else:
-            intercepted_qubits = encoded_qubits
 
-        # Bob Measures
-        bob_bases = protocol.generate_bases(n)
-        bob_results = protocol.measure(intercepted_qubits, bob_bases, backend)
+        # Run Simulation via Engine
+        engine = SimulationEngine(protocol, attack, backend)
 
-        # Sifting and Error Analysis
-        key_a, key_b, sifted_indices = protocol.sift(alice_bases, bob_bases, alice_bits, bob_results)
-        qber = calculate_qber(key_a, key_b)
-        is_secure, security_status = analyze_security(qber)
-
-        report = generate_error_report(alice_bits, bob_results, alice_bases, bob_bases, key_a, key_b)
-
-        # Visualization Data
-        viz_data = {
-            "alice_bits": alice_bits,
-            "alice_bases": alice_bases,
-            "bob_bases": bob_bases,
-            "bob_results": bob_results,
-            "key_a": key_a,
-            "key_b": key_b,
-            "qber": qber,
-            "report": report,
-            "is_secure": is_secure,
-            "security_status": security_status,
-            "encoded_qubits": encoded_qubits
-        }
+        with st.status("Initializing simulation...", expanded=True) as status:
+            viz_data = engine.run(n, callback=lambda msg: status.update(label=msg))
+            status.update(label="Simulation Complete!", state="complete", expanded=False)
 
         st.subheader("📬 Sifted Key Result")
         st.text(f"Alice's Key: {''.join(map(str, viz_data['key_a']))}")

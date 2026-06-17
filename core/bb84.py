@@ -4,10 +4,17 @@ from qiskit_aer import AerSimulator
 from core.protocol import QKDProtocol
 
 class BB84Protocol(QKDProtocol):
+    @property
+    def name(self):
+        return "BB84"
+
     def generate_bits(self, n):
         return [random.randint(0, 1) for _ in range(n)]
 
-    def generate_bases(self, n):
+    def generate_alice_bases(self, n):
+        return [random.choice(['Z', 'X']) for _ in range(n)]
+
+    def generate_bob_bases(self, n):
         return [random.choice(['Z', 'X']) for _ in range(n)]
 
     def encode(self, bits, bases):
@@ -42,7 +49,6 @@ class BB84Protocol(QKDProtocol):
         results = []
         for i in range(len(circuits)):
             # Qiskit 1.0.2 memory access for batched jobs
-            # job.result().get_memory(i) returns the list of memory entries for the i-th circuit
             mem = result_data.get_memory(i)
             results.append(int(mem[0]))
 

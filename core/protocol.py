@@ -1,14 +1,25 @@
 from abc import ABC, abstractmethod
 
 class QKDProtocol(ABC):
+    @property
+    @abstractmethod
+    def name(self):
+        """Returns the name of the protocol."""
+        pass
+
     @abstractmethod
     def generate_bits(self, n):
         """Generate random bits for Alice."""
         pass
 
     @abstractmethod
-    def generate_bases(self, n):
-        """Generate random bases for Alice and Bob."""
+    def generate_alice_bases(self, n):
+        """Generate random bases for Alice."""
+        pass
+
+    @abstractmethod
+    def generate_bob_bases(self, n):
+        """Generate random bases for Bob."""
         pass
 
     @abstractmethod
