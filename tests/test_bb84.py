@@ -8,9 +8,15 @@ def test_bb84_generate_bits():
     assert len(bits) == 10
     assert all(bit in [0, 1] for bit in bits)
 
-def test_bb84_generate_bases():
+def test_bb84_generate_alice_bases():
     protocol = BB84Protocol()
-    bases = protocol.generate_bases(10)
+    bases = protocol.generate_alice_bases(10)
+    assert len(bases) == 10
+    assert all(base in ['Z', 'X'] for base in bases)
+
+def test_bb84_generate_bob_bases():
+    protocol = BB84Protocol()
+    bases = protocol.generate_bob_bases(10)
     assert len(bases) == 10
     assert all(base in ['Z', 'X'] for base in bases)
 
@@ -33,10 +39,10 @@ def test_bb84_full_no_eve():
     n = 20
 
     alice_bits = protocol.generate_bits(n)
-    alice_bases = protocol.generate_bases(n)
+    alice_bases = protocol.generate_alice_bases(n)
     encoded = protocol.encode(alice_bits, alice_bases)
 
-    bob_bases = protocol.generate_bases(n)
+    bob_bases = protocol.generate_bob_bases(n)
     bob_results = protocol.measure(encoded, bob_bases, backend)
 
     key_a, key_b, _ = protocol.sift(alice_bases, bob_bases, alice_bits, bob_results)

@@ -10,7 +10,7 @@ def test_intercept_resend():
     n = 100
 
     alice_bits = protocol.generate_bits(n)
-    alice_bases = protocol.generate_bases(n)
+    alice_bases = protocol.generate_alice_bases(n)
     encoded = protocol.encode(alice_bits, alice_bases)
 
     intercepted = attack.apply(encoded, backend)
@@ -34,7 +34,7 @@ def test_noisy_channel():
     n = 100
 
     alice_bits = protocol.generate_bits(n)
-    alice_bases = protocol.generate_bases(n)
+    alice_bases = protocol.generate_alice_bases(n)
     encoded = protocol.encode(alice_bits, alice_bases)
 
     noisy = attack.apply(encoded, backend)
