@@ -4,6 +4,10 @@ from qiskit_aer import AerSimulator
 from core.protocol import QKDProtocol
 
 class BB84Protocol(QKDProtocol):
+    @property
+    def name(self):
+        return "BB84"
+
     def generate_bits(self, n):
         return [random.randint(0, 1) for _ in range(n)]
 
