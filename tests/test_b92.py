@@ -16,7 +16,7 @@ def test_b92_sift():
     # Index 0: Alice 0 (|0>), Bob X (measure in {|+>, |->}). If Bob gets 1 (|->), it's conclusive. key_b=0
     # Index 1: Alice 1 (|+>), Bob Z (measure in {|0>, |1>}). If Bob gets 1 (|1>), it's conclusive. key_b=1
 
-    key_a, key_b, indices = protocol.sift(None, bob_bases, alice_bits, bob_results)
+    key_a, key_b, indices = protocol.sift(["B92"]*4, bob_bases, alice_bits, bob_results)
 
     assert key_a == [0, 1]
     assert key_b == [0, 1]
@@ -33,7 +33,7 @@ def test_b92_full_no_eve():
     bob_bases = protocol.generate_bases(n)
     bob_results = protocol.measure(encoded, bob_bases, backend)
 
-    key_a, key_b, _ = protocol.sift(None, bob_bases, alice_bits, bob_results)
+    key_a, key_b, _ = protocol.sift(["B92"]*n, bob_bases, alice_bits, bob_results)
 
     assert len(key_a) > 0
     assert key_a == key_b

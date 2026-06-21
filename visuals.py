@@ -1,4 +1,18 @@
 import streamlit.components.v1 as components
+from qiskit.quantum_info import Statevector
+import numpy as np
+
+def get_bloch_coordinates(qc):
+    """
+    Extract Bloch sphere coordinates [x, y, z] from a quantum circuit.
+    """
+    sv = Statevector.from_instruction(qc)
+    # Expectation values of Pauli operators give the Bloch coordinates
+    # For a single qubit state rho: rho = 1/2 (I + xX + yY + zZ)
+    x = sv.expectation_value([[0, 1], [1, 0]]).real
+    y = sv.expectation_value([[0, -1j], [1j, 0]]).real
+    z = sv.expectation_value([[1, 0], [0, -1]]).real
+    return [x, y, z]
 
 def bloch_sphere(state_vector=[1, 0, 0], height=500):
     """
