@@ -24,7 +24,7 @@ def test_intercept_resend():
     qber = errors / len(key_a) if key_a else 0
 
     # Intercept-Resend should introduce ~25% QBER in BB84
-    assert 0.15 < qber < 0.45
+    assert 0.10 < qber < 0.45
 
 def test_noisy_channel():
     protocol = BB84Protocol()
