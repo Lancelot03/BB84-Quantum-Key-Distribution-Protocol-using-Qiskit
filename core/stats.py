@@ -10,7 +10,7 @@ def analyze_security(qber, threshold=0.11):
     is_secure = qber <= threshold
     return is_secure, "Secure" if is_secure else "Compromised"
 
-def generate_error_report(alice_bits, bob_results, alice_bases, bob_bases, sifted_alice, sifted_bob):
+def generate_error_report(alice_bits, bob_results, alice_bases, bob_bases, sifted_alice, sifted_bob, qber):
     """
     Generate a detailed error analysis report.
     Supports both BB84 and B92 logic.
@@ -21,24 +21,18 @@ def generate_error_report(alice_bits, bob_results, alice_bases, bob_bases, sifte
     # Efficiency of basis matching (or conclusive results in B92)
     basis_match_efficiency = (sifted_length / total_qubits) * 100 if total_qubits > 0 else 0
 
-    # QBER
-    qber = calculate_qber(sifted_alice, sifted_bob)
-
     # Analyze errors per basis
     z_errors = 0
     z_total = 0
     x_errors = 0
     x_total = 0
 
-    # Check if we are in B92 mode (Alice bases are usually labeled 'B92' in the current app.py)
+    # Check if we are in B92 mode
     is_b92 = all(b == 'B92' for b in alice_bases)
 
     for i in range(total_qubits):
         if is_b92:
-            # B92 Logic: Sifted only if bob_results[i] == 1
             if bob_results[i] == 1:
-                # If Bob measured 1 in Z, Alice must have sent bit 1
-                # If Bob measured 1 in X, Alice must have sent bit 0
                 if bob_bases[i] == 'Z':
                     z_total += 1
                     if alice_bits[i] != 1:
