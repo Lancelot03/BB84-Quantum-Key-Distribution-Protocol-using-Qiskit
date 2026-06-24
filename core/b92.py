@@ -5,6 +5,10 @@ from core.protocol import QKDProtocol
 from core import stats
 
 class B92Protocol(QKDProtocol):
+    @property
+    def name(self):
+        return "B92"
+
     def generate_bits(self, n):
         return [random.randint(0, 1) for _ in range(n)]
 
