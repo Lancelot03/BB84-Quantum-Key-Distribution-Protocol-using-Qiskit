@@ -1,3 +1,4 @@
+from .engine import SimulationEngine
 from .bb84 import BB84Protocol
 from .b92 import B92Protocol
 from .attacks import InterceptResend, NoisyChannel, PhotonNumberSplitting
