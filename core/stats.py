@@ -10,19 +10,12 @@ def analyze_security(qber, threshold=0.11):
     is_secure = qber <= threshold
     return is_secure, "Secure" if is_secure else "Compromised"
 
-def generate_error_report(alice_bits, bob_results, alice_bases, bob_bases, sifted_alice, sifted_bob):
+def generate_error_report(alice_bits, bob_results, alice_bases, bob_bases, qber):
     """
     Generate a detailed error analysis report.
     Supports both BB84 and B92 logic.
     """
     total_qubits = len(alice_bits)
-    sifted_length = len(sifted_alice)
-
-    # Efficiency of basis matching (or conclusive results in B92)
-    basis_match_efficiency = (sifted_length / total_qubits) * 100 if total_qubits > 0 else 0
-
-    # QBER
-    qber = calculate_qber(sifted_alice, sifted_bob)
 
     # Analyze errors per basis
     z_errors = 0
@@ -61,6 +54,9 @@ def generate_error_report(alice_bits, bob_results, alice_bases, bob_bases, sifte
 
     z_error_rate = (z_errors / z_total) if z_total > 0 else 0
     x_error_rate = (x_errors / x_total) if x_total > 0 else 0
+
+    sifted_length = z_total + x_total
+    basis_match_efficiency = (sifted_length / total_qubits) * 100 if total_qubits > 0 else 0
 
     return {
         "total_qubits": total_qubits,
