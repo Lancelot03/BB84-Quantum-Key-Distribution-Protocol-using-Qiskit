@@ -1,4 +1,17 @@
 import streamlit.components.v1 as components
+import numpy as np
+from qiskit.quantum_info import Statevector
+
+def get_bloch_coordinates(qc):
+    """
+    Calculate the [x, y, z] coordinates on the Bloch sphere for a given quantum circuit.
+    """
+    state = Statevector.from_instruction(qc)
+    # Expectation values for Pauli matrices
+    x = state.expectation_value([[0, 1], [1, 0]]).real
+    y = state.expectation_value([[0, -1j], [1j, 0]]).real
+    z = state.expectation_value([[1, 0], [0, -1]]).real
+    return [x, y, z]
 
 def bloch_sphere(state_vector=[1, 0, 0], height=500):
     """
@@ -50,9 +63,6 @@ def bloch_sphere(state_vector=[1, 0, 0], height=500):
             // Axes
             const axesHelper = new THREE.AxesHelper(3);
             scene.add(axesHelper);
-
-            // Labels for axes
-            // (Simplifying for now, can add text sprites later)
 
             // State Vector
             const dir = new THREE.Vector3({state_vector[0]}, {state_vector[2]}, {state_vector[1]}); // Three.js uses Y as up, Bloch uses Z as up
