@@ -16,7 +16,7 @@ def test_intercept_resend():
     intercepted = attack.apply(encoded, backend)
 
     bob_bases = alice_bases # Perfect basis matching to isolate Eve's effect
-    bob_results = protocol.measure(intercepted, bob_bases, backend)
+    bob_results, _ = protocol.measure(intercepted, bob_bases, backend)
 
     key_a, key_b, _ = protocol.sift(alice_bases, bob_bases, alice_bits, bob_results)
 
@@ -40,7 +40,7 @@ def test_noisy_channel():
     noisy = attack.apply(encoded, backend)
 
     bob_bases = alice_bases
-    bob_results = protocol.measure(noisy, bob_bases, backend)
+    bob_results, _ = protocol.measure(noisy, bob_bases, backend)
 
     key_a, key_b, _ = protocol.sift(alice_bases, bob_bases, alice_bits, bob_results)
 

@@ -18,11 +18,7 @@ class SimulationEngine:
 
         # Alice's side: bit and basis generation
         alice_bits = protocol.generate_bits(n)
-        if protocol.name == "BB84":
-            alice_bases = protocol.generate_bases(n)
-        else:
-            # B92 Alice doesn't use bases in the same way, but for reporting we label it
-            alice_bases = ["B92"] * n
+        alice_bases = protocol.generate_alice_bases(n)
 
         # Encoding into quantum circuits
         circuits = protocol.encode(alice_bits, alice_bases)
@@ -38,7 +34,7 @@ class SimulationEngine:
         # Bob's side: basis generation and measurement
         bob_bases = protocol.generate_bases(n)
         log("Bob is measuring the received qubits...")
-        bob_results = protocol.measure(intercepted_circuits, bob_bases, backend)
+        bob_results, meas_circuits = protocol.measure(intercepted_circuits, bob_bases, backend)
 
         # Sifting process (reconciling keys over classical channel)
         log("Performing key sifting...")
@@ -64,5 +60,6 @@ class SimulationEngine:
             "is_secure": is_secure,
             "security_status": security_status,
             "report": report,
-            "circuits": circuits
+            "alice_circuits": circuits,
+            "bob_circuits": meas_circuits
         }

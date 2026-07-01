@@ -31,9 +31,10 @@ def test_b92_full_no_eve():
     encoded = protocol.encode(alice_bits)
 
     bob_bases = protocol.generate_bases(n)
-    bob_results = protocol.measure(encoded, bob_bases, backend)
+    bob_results, _ = protocol.measure(encoded, bob_bases, backend)
 
-    key_a, key_b, _ = protocol.sift(None, bob_bases, alice_bits, bob_results)
+    alice_bases = protocol.generate_alice_bases(n)
+    key_a, key_b, _ = protocol.sift(alice_bases, bob_bases, alice_bits, bob_results)
 
     assert len(key_a) > 0
     assert key_a == key_b

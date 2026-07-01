@@ -11,6 +11,9 @@ class BB84Protocol(QKDProtocol):
     def generate_bits(self, n):
         return [random.randint(0, 1) for _ in range(n)]
 
+    def generate_alice_bases(self, n):
+        return [random.choice(['Z', 'X']) for _ in range(n)]
+
     def generate_bases(self, n):
         return [random.choice(['Z', 'X']) for _ in range(n)]
 
@@ -50,7 +53,7 @@ class BB84Protocol(QKDProtocol):
             mem = result_data.get_memory(i)
             results.append(int(mem[0]))
 
-        return results
+        return results, meas_circuits
 
     def sift(self, alice_bases, bob_bases, alice_bits, bob_bits):
         sifted_a, sifted_b = [], []

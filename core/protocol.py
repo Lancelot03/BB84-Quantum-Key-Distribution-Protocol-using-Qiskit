@@ -13,8 +13,13 @@ class QKDProtocol(ABC):
         pass
 
     @abstractmethod
+    def generate_alice_bases(self, n):
+        """Generate random bases for Alice's encoding."""
+        pass
+
+    @abstractmethod
     def generate_bases(self, n):
-        """Generate random bases for Alice and Bob."""
+        """Generate random bases for Bob's measurement."""
         pass
 
     @abstractmethod
@@ -24,7 +29,10 @@ class QKDProtocol(ABC):
 
     @abstractmethod
     def measure(self, circuits, bases, backend=None):
-        """Measure the quantum circuits using the given bases."""
+        """
+        Measure the quantum circuits using the given bases.
+        Returns a tuple of (results, measurement_circuits).
+        """
         pass
 
     @abstractmethod

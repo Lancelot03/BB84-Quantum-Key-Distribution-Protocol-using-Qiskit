@@ -12,6 +12,8 @@ def test_engine_bb84_no_attack():
     assert len(results['alice_bases']) == n
     assert len(results['bob_bases']) == n
     assert len(results['bob_results']) == n
+    assert len(results['alice_circuits']) == n
+    assert len(results['bob_circuits']) == n
     assert results['qber'] == 0.0
     assert results['is_secure'] is True
 
