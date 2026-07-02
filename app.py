@@ -113,13 +113,27 @@ with tab1:
             st.success("✅ Low QBER. Communication likely secure.")
 
         # Real-time Circuit Display
-        st.subheader("🛠️ Quantum Circuit (First Qubit)")
-        st.pyplot(draw_circuit_visual(viz_data['circuits'][0]))
+        st.subheader("🛠️ Quantum Circuits (First Qubit)")
+        col_c1, col_c2 = st.columns(2)
+        with col_c1:
+            st.markdown("**Alice's Encoding Circuit**")
+            st.pyplot(draw_circuit_visual(viz_data['alice_circuits'][0]))
+        with col_c2:
+            st.markdown("**Bob's Measurement Circuit**")
+            st.pyplot(draw_circuit_visual(viz_data['bob_circuits'][0]))
 
         with st.expander("🛠️ Quantum Circuit Preview (First 5 Qubits)"):
             for i in range(min(5, n)):
-                st.write(f"Qubit {i} (Basis: {viz_data['alice_bases'][i]}, Bit: {viz_data['alice_bits'][i]})")
-                st.pyplot(viz_data['circuits'][i].draw('mpl'))
+                st.write(f"### Qubit {i}")
+                st.write(f"**Alice Basis:** {viz_data['alice_bases'][i]}, **Alice Bit:** {viz_data['alice_bits'][i]}")
+                st.write(f"**Bob Basis:** {viz_data['bob_bases'][i]}")
+                col_i1, col_i2 = st.columns(2)
+                with col_i1:
+                    st.markdown("*Encoding:*")
+                    st.pyplot(viz_data['alice_circuits'][i].draw('mpl'))
+                with col_i2:
+                    st.markdown("*Measurement:*")
+                    st.pyplot(viz_data['bob_circuits'][i].draw('mpl'))
 
         if viz_data['report']:
             st.subheader("📊 Detailed Error Analysis")
@@ -143,16 +157,20 @@ with tab2:
     theory_tab, visual_tab = st.tabs(["📖 Mathematical Core", "🎨 Animations"])
 
     with theory_tab:
-        st.subheader("Quantum States & Bases")
-        st.write("In BB84, we use two mutually unbiased bases:")
+        st.subheader("BB84 Protocol: Mutually Unbiased Bases")
+        st.write("In BB84, we use two mutually unbiased bases to encode bits into quantum states:")
         st.latex(r"Z\text{-basis: } \{|0\rangle, |1\rangle\} \quad X\text{-basis: } \{|+\rangle, |-\rangle\}")
-        st.write("Where:")
-        st.latex(r"|+\rangle = \frac{|0\rangle + |1\rangle}{\sqrt{2}}, \quad |-\rangle = \frac{|0\rangle - |1\rangle}{\sqrt{2}}")
+        st.write("Alice randomly chooses a bit (0 or 1) and a basis (Z or X). Bob also chooses a basis at random to measure. If their bases match, Bob gets the correct bit.")
+
+        st.subheader("B92 Protocol: Non-Orthogonal States")
+        st.write("B92 uses only two non-orthogonal states for encoding:")
+        st.latex(r"\text{Bit 0: } |0\rangle \quad \text{Bit 1: } |+\rangle = \frac{|0\rangle + |1\rangle}{\sqrt{2}}")
+        st.write("Bob chooses to measure in either the X-basis or the Z-basis. A conclusive result (measuring '1') only happens if his basis is different from Alice's encoding.")
 
         st.subheader("Quantum Bit Error Rate (QBER)")
-        st.write("The security of BB84 relies on detecting errors introduced by an eavesdropper. QBER is defined as:")
+        st.write("The security of QKD relies on detecting errors introduced by an eavesdropper. QBER is defined as:")
         st.latex(r"QBER = \frac{\text{Number of mismatched bits}}{\text{Total compared bits}}")
-        st.write(r"Typically, if $QBER > 11\%$, the key is considered compromised.")
+        st.write(r"Typically, if $QBER > 11\%$ in BB84, the key is considered compromised. Eavesdropping necessarily introduces errors due to the No-Cloning Theorem.")
 
     with visual_tab:
         st.subheader("1. Qubit States & Bloch Sphere")

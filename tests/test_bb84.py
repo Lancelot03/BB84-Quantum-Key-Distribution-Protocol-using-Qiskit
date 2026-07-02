@@ -37,7 +37,7 @@ def test_bb84_full_no_eve():
     encoded = protocol.encode(alice_bits, alice_bases)
 
     bob_bases = protocol.generate_bases(n)
-    bob_results = protocol.measure(encoded, bob_bases, backend)
+    bob_results, _ = protocol.measure(encoded, bob_bases, backend)
 
     key_a, key_b, _ = protocol.sift(alice_bases, bob_bases, alice_bits, bob_results)
 
