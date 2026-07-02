@@ -6,7 +6,7 @@ try:
 except ImportError:
     QiskitRuntimeService = None
 import matplotlib.pyplot as plt
-from visuals import bloch_sphere, photon_transmission, basis_matching_visual, draw_circuit_visual
+from visuals import bloch_sphere, photon_transmission, basis_matching_visual, draw_circuit_visual, get_bloch_coordinates
 from core import (
     BB84Protocol,
     B92Protocol,
@@ -92,14 +92,25 @@ with tab1:
                 attack = PhotonNumberSplitting()
 
         # Run Simulation with UI status updates
+        progress_bar = st.progress(0, text="Initializing simulation...")
+
         with st.status("🚀 Simulation in Progress...") as status:
+            def update_progress(msg):
+                status.update(label=msg)
+                # Simple heuristic for progress bar based on logs
+                if "encoded" in msg: progress_bar.progress(30, text=msg)
+                elif "attack" in msg: progress_bar.progress(50, text=msg)
+                elif "measuring" in msg: progress_bar.progress(70, text=msg)
+                elif "sifting" in msg: progress_bar.progress(90, text=msg)
+
             viz_data = engine.run(
                 protocol=protocol,
                 n=n,
                 attack=attack,
                 backend=backend,
-                callback=lambda msg: status.update(label=msg)
+                callback=update_progress
             )
+            progress_bar.progress(100, text="✅ Done!")
             status.update(label="✅ Simulation Complete!", state="complete", expanded=False)
 
         st.subheader("📬 Sifted Key Result")
@@ -108,9 +119,12 @@ with tab1:
         st.markdown(f"### ❗ QBER: `{viz_data['qber'] * 100:.2f}%` - Status: **{viz_data['security_status']}**")
 
         if not viz_data['is_secure']:
-            st.error("⚠️ High QBER! Potential eavesdropping detected.")
+            st.error(f"⚠️ High QBER! Potential eavesdropping detected. Eve knows ~{viz_data['eve_info_gain']*100:.1f}% of your sifted key!")
         else:
-            st.success("✅ Low QBER. Communication likely secure.")
+            if viz_data['eve_info_gain'] > 0:
+                 st.warning(f"✅ Low QBER, but Eve still gained ~{viz_data['eve_info_gain']*100:.1f}% knowledge (e.g. via PNS).")
+            else:
+                 st.success("✅ Low QBER and no information leak detected. Communication likely secure.")
 
         # Real-time Circuit Display
         st.subheader("🛠️ Quantum Circuits (First Qubit)")
@@ -137,10 +151,20 @@ with tab1:
 
         if viz_data['report']:
             st.subheader("📊 Detailed Error Analysis")
-            col1, col2, col3 = st.columns(3)
+            col1, col2, col3, col4 = st.columns(4)
             col1.metric("Sifting Efficiency", f"{viz_data['report']['basis_match_efficiency']:.1f}%")
             col2.metric("Z-Basis Error Rate", f"{viz_data['report']['z_error_rate']*100:.1f}%")
             col3.metric("X-Basis Error Rate", f"{viz_data['report']['x_error_rate']*100:.1f}%")
+            col4.metric("Eve's Knowledge", f"{viz_data['report']['eve_info_gain']*100:.1f}%")
+
+        st.subheader("🔍 Visual Qubit Analysis (First 3 Qubits)")
+        vcol1, vcol2, vcol3 = st.columns(3)
+        cols = [vcol1, vcol2, vcol3]
+        for i in range(3):
+            with cols[i]:
+                st.write(f"**Qubit {i}**")
+                coords = get_bloch_coordinates(viz_data['alice_circuits'][i])
+                bloch_sphere(state_vector=coords, height=250)
 
         st.subheader("🔍 Basis Matching")
         basis_matching_visual(viz_data['alice_bases'][:20], viz_data['bob_bases'][:20])
