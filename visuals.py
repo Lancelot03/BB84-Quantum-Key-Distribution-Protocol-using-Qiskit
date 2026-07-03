@@ -1,4 +1,18 @@
 import streamlit.components.v1 as components
+from qiskit.quantum_info import Statevector, Pauli
+
+def get_bloch_coordinates(qc):
+    """
+    Calculates the Bloch sphere coordinates (x, y, z) for a single-qubit circuit.
+    """
+    try:
+        sv = Statevector.from_instruction(qc)
+        x = sv.expectation_value(Pauli('X')).real
+        y = sv.expectation_value(Pauli('Y')).real
+        z = sv.expectation_value(Pauli('Z')).real
+        return [x, y, z]
+    except Exception:
+        return [0, 0, 1] # Default to |0> on error
 
 def bloch_sphere(state_vector=[1, 0, 0], height=500):
     """
@@ -50,9 +64,6 @@ def bloch_sphere(state_vector=[1, 0, 0], height=500):
             // Axes
             const axesHelper = new THREE.AxesHelper(3);
             scene.add(axesHelper);
-
-            // Labels for axes
-            // (Simplifying for now, can add text sprites later)
 
             // State Vector
             const dir = new THREE.Vector3({state_vector[0]}, {state_vector[2]}, {state_vector[1]}); // Three.js uses Y as up, Bloch uses Z as up
@@ -157,7 +168,6 @@ def photon_transmission(n_photons=10, height=300):
     return components.html(html_code, height=height)
 
 def basis_matching_visual(alice_bases, bob_bases, height=200):
-    matches = "".join(["✅" if a == b else "❌" for a, b in zip(alice_bases, bob_bases)])
     html_code = f"""
     <!DOCTYPE html>
     <html>

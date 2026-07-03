@@ -6,7 +6,7 @@ try:
 except ImportError:
     QiskitRuntimeService = None
 import matplotlib.pyplot as plt
-from visuals import bloch_sphere, photon_transmission, basis_matching_visual, draw_circuit_visual
+from visuals import bloch_sphere, photon_transmission, basis_matching_visual, draw_circuit_visual, get_bloch_coordinates
 from core import (
     BB84Protocol,
     B92Protocol,
@@ -91,26 +91,55 @@ with tab1:
             else:
                 attack = PhotonNumberSplitting()
 
+        # Progress bar
+        progress_bar = st.progress(0, text="Initializing simulation...")
+
         # Run Simulation with UI status updates
         with st.status("🚀 Simulation in Progress...") as status:
+            def update_ui(msg):
+                status.update(label=msg)
+                # Simple heuristic for progress
+                if "Initializing" in msg: progress_bar.progress(10, text=msg)
+                elif "encoded" in msg: progress_bar.progress(30, text=msg)
+                elif "Applying" in msg: progress_bar.progress(50, text=msg)
+                elif "measuring" in msg: progress_bar.progress(70, text=msg)
+                elif "sifting" in msg: progress_bar.progress(85, text=msg)
+                elif "Analyzing" in msg: progress_bar.progress(95, text=msg)
+
             viz_data = engine.run(
                 protocol=protocol,
                 n=n,
                 attack=attack,
                 backend=backend,
-                callback=lambda msg: status.update(label=msg)
+                callback=update_ui
             )
+            progress_bar.progress(100, text="✅ Simulation Complete!")
             status.update(label="✅ Simulation Complete!", state="complete", expanded=False)
 
         st.subheader("📬 Sifted Key Result")
         st.text(f"Alice's Key: {''.join(map(str, viz_data['key_a']))}")
         st.text(f"Bob's Key:   {''.join(map(str, viz_data['key_b']))}")
-        st.markdown(f"### ❗ QBER: `{viz_data['qber'] * 100:.2f}%` - Status: **{viz_data['security_status']}**")
+
+        col_res1, col_res2 = st.columns(2)
+        with col_res1:
+            st.markdown(f"### ❗ QBER: `{viz_data['qber'] * 100:.2f}%` - Status: **{viz_data['security_status']}**")
+        with col_res2:
+            if viz_data['eve_info']:
+                st.markdown(f"### 🕵️ Eve Info Gain: `{viz_data['eve_info']['info_gain'] * 100:.1f}%` ({viz_data['eve_info']['type']})")
 
         if not viz_data['is_secure']:
             st.error("⚠️ High QBER! Potential eavesdropping detected.")
         else:
             st.success("✅ Low QBER. Communication likely secure.")
+
+        # Real-time Visualization
+        st.subheader("🌐 Quantum State Visualization (First 3 Qubits)")
+        bloch_cols = st.columns(3)
+        for i in range(min(3, n)):
+            with bloch_cols[i]:
+                coords = get_bloch_coordinates(viz_data['alice_circuits'][i])
+                st.markdown(f"**Qubit {i} State**")
+                bloch_sphere(state_vector=coords, height=300)
 
         # Real-time Circuit Display
         st.subheader("🛠️ Quantum Circuits (First Qubit)")
