@@ -6,7 +6,7 @@ try:
 except ImportError:
     QiskitRuntimeService = None
 import matplotlib.pyplot as plt
-from visuals import bloch_sphere, photon_transmission, basis_matching_visual, draw_circuit_visual
+from visuals import bloch_sphere, photon_transmission, basis_matching_visual, draw_circuit_visual, get_bloch_coordinates
 from core import (
     BB84Protocol,
     B92Protocol,
@@ -111,6 +111,18 @@ with tab1:
             st.error("⚠️ High QBER! Potential eavesdropping detected.")
         else:
             st.success("✅ Low QBER. Communication likely secure.")
+
+        if eve_present:
+            st.warning(f"🕵️ Eve intercepted the channel! Info gain: **{viz_data.get('eve_info_gain', 0) * 100:.1f}%**")
+
+        # Real-time Bloch Sphere Visualization (First 3 Qubits)
+        st.subheader("🔮 Quantum State Visualization (Bloch Sphere)")
+        bloch_cols = st.columns(3)
+        for i in range(min(3, n)):
+            with bloch_cols[i]:
+                st.markdown(f"**Qubit {i}**")
+                coords = get_bloch_coordinates(viz_data['alice_circuits'][i])
+                bloch_sphere(state_vector=coords, height=300)
 
         # Real-time Circuit Display
         st.subheader("🛠️ Quantum Circuits (First Qubit)")

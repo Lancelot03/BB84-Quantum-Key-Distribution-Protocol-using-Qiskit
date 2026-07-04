@@ -25,9 +25,11 @@ class SimulationEngine:
         log("Quantum states encoded.")
 
         # Optional Eavesdropper/Channel Attack
+        eve_info_gain = 0
         if attack:
             log(f"Applying {type(attack).__name__} attack to the channel...")
-            intercepted_circuits = attack.apply(circuits, backend)
+            intercepted_circuits, intercepted_info = attack.apply(circuits, backend)
+            eve_info_gain = intercepted_info.get('info_gain', 0)
         else:
             intercepted_circuits = circuits
 
@@ -44,7 +46,16 @@ class SimulationEngine:
         log("Analyzing Quantum Bit Error Rate (QBER)...")
         qber = calculate_qber(key_a, key_b)
         is_secure, security_status = analyze_security(qber)
-        report = generate_error_report(alice_bits, bob_results, alice_bases, bob_bases, key_a, key_b)
+        report = generate_error_report(
+            alice_bits,
+            bob_results,
+            alice_bases,
+            bob_bases,
+            key_a,
+            key_b,
+            qber,
+            protocol.name
+        )
 
         log("Simulation complete.")
         return {
@@ -61,5 +72,6 @@ class SimulationEngine:
             "security_status": security_status,
             "report": report,
             "alice_circuits": circuits,
-            "bob_circuits": meas_circuits
+            "bob_circuits": meas_circuits,
+            "eve_info_gain": eve_info_gain
         }

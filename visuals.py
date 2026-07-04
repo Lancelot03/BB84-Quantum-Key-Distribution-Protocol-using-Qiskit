@@ -1,4 +1,26 @@
 import streamlit.components.v1 as components
+from qiskit.quantum_info import Statevector
+
+def get_bloch_coordinates(qc):
+    """
+    Calculate Cartesian coordinates (x, y, z) on the Bloch sphere from a QuantumCircuit.
+    """
+    try:
+        sv = Statevector.from_instruction(qc)
+        # For a single qubit, state = alpha|0> + beta|1>
+        # x = 2*Re(alpha*conj(beta))
+        # y = 2*Im(alpha*conj(beta))
+        # z = |alpha|^2 - |beta|^2
+        # But Statevector has a more direct way: expectation values of Pauli operators
+        # In Qiskit, sv.expectation_value works
+        from qiskit.quantum_info import SparsePauliOp
+        x = sv.expectation_value(SparsePauliOp('X')).real
+        y = sv.expectation_value(SparsePauliOp('Y')).real
+        z = sv.expectation_value(SparsePauliOp('Z')).real
+        return [x, y, z]
+    except Exception:
+        # Default to |0> state if error occurs
+        return [0, 0, 1]
 
 def bloch_sphere(state_vector=[1, 0, 0], height=500):
     """
@@ -50,9 +72,6 @@ def bloch_sphere(state_vector=[1, 0, 0], height=500):
             // Axes
             const axesHelper = new THREE.AxesHelper(3);
             scene.add(axesHelper);
-
-            // Labels for axes
-            // (Simplifying for now, can add text sprites later)
 
             // State Vector
             const dir = new THREE.Vector3({state_vector[0]}, {state_vector[2]}, {state_vector[1]}); // Three.js uses Y as up, Bloch uses Z as up
