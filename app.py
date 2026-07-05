@@ -5,8 +5,15 @@ try:
     from qiskit_ibm_runtime import QiskitRuntimeService
 except ImportError:
     QiskitRuntimeService = None
-import matplotlib.pyplot as plt
-from visuals import bloch_sphere, photon_transmission, basis_matching_visual, draw_circuit_visual
+from visuals import (
+    bloch_sphere,
+    photon_transmission,
+    basis_matching_visual,
+    draw_circuit_visual,
+    plot_bit_differences,
+    plot_qber_bar,
+    get_bloch_coordinates
+)
 from core import (
     BB84Protocol,
     B92Protocol,
@@ -30,26 +37,6 @@ def get_backend(use_hardware=False, api_key=""):
             return AerSimulator()
     else:
         return AerSimulator()
-
-# Plotting Functions
-def plot_bit_differences(key_a, key_b):
-    diffs = [int(a != b) for a, b in zip(key_a, key_b)]
-    fig, ax = plt.subplots(figsize=(10, 2))
-    ax.plot(diffs, marker='o', color='red', label='Mismatch')
-    ax.set_title('Bit Differences (1 = Error)')
-    ax.set_xlabel('Bit Index')
-    ax.set_ylabel('Difference')
-    ax.grid(True)
-    return fig
-
-def plot_qber_bar(qber):
-    fig, ax = plt.subplots()
-    correct = 100 * (1 - qber)
-    incorrect = 100 * qber
-    ax.bar(['Correct', 'Incorrect'], [correct, incorrect], color=['green', 'red'])
-    ax.set_title(f'QBER: {qber * 100:.2f}%')
-    ax.set_ylim(0, 100)
-    return fig
 
 # --- Streamlit App ---
 st.set_page_config(page_title="Quantum Key Distribution Simulator", layout="wide")
@@ -92,38 +79,55 @@ with tab1:
                 attack = PhotonNumberSplitting()
 
         # Run Simulation with UI status updates
+        progress_bar = st.progress(0)
         with st.status("🚀 Simulation in Progress...") as status:
+            def update_ui(msg, progress):
+                status.update(label=msg)
+                if progress is not None:
+                    progress_bar.progress(progress)
+
             viz_data = engine.run(
                 protocol=protocol,
                 n=n,
                 attack=attack,
                 backend=backend,
-                callback=lambda msg: status.update(label=msg)
+                callback=update_ui
             )
             status.update(label="✅ Simulation Complete!", state="complete", expanded=False)
 
         st.subheader("📬 Sifted Key Result")
         st.text(f"Alice's Key: {''.join(map(str, viz_data['key_a']))}")
         st.text(f"Bob's Key:   {''.join(map(str, viz_data['key_b']))}")
-        st.markdown(f"### ❗ QBER: `{viz_data['qber'] * 100:.2f}%` - Status: **{viz_data['security_status']}**")
+
+        col_res1, col_res2, col_res3 = st.columns(3)
+        col_res1.markdown(f"### ❗ QBER: `{viz_data['qber'] * 100:.2f}%`")
+        col_res2.markdown(f"### 🛡️ Status: **{viz_data['security_status']}**")
+        if eve_present:
+            col_res3.markdown(f"### 🕵️ Eve Info Gain: `{viz_data['eve_info_gain'] * 100:.1f}%`")
 
         if not viz_data['is_secure']:
             st.error("⚠️ High QBER! Potential eavesdropping detected.")
         else:
             st.success("✅ Low QBER. Communication likely secure.")
 
-        # Real-time Circuit Display
-        st.subheader("🛠️ Quantum Circuits (First Qubit)")
-        col_c1, col_c2 = st.columns(2)
-        with col_c1:
-            st.markdown("**Alice's Encoding Circuit**")
-            st.pyplot(draw_circuit_visual(viz_data['alice_circuits'][0]))
-        with col_c2:
-            st.markdown("**Bob's Measurement Circuit**")
-            st.pyplot(draw_circuit_visual(viz_data['bob_circuits'][0]))
+        # Real-time Circuit & Bloch Display
+        st.subheader("🛠️ Quantum State Visualization (First 3 Qubits)")
+        for i in range(3):
+            st.markdown(f"#### Qubit {i}")
+            c1, c2, c3 = st.columns([1, 1, 1])
+            with c1:
+                st.markdown("**Alice's Encoding**")
+                st.pyplot(draw_circuit_visual(viz_data['alice_circuits'][i]))
+            with c2:
+                st.markdown("**Bloch Sphere (State After Encoding)**")
+                coords = get_bloch_coordinates(viz_data['alice_circuits'][i])
+                bloch_sphere(state_vector=coords, height=300)
+            with c3:
+                st.markdown("**Bob's Measurement**")
+                st.pyplot(draw_circuit_visual(viz_data['bob_circuits'][i]))
 
-        with st.expander("🛠️ Quantum Circuit Preview (First 5 Qubits)"):
-            for i in range(min(5, n)):
+        with st.expander("🛠️ Full Quantum Circuit Preview (First 10 Qubits)"):
+            for i in range(min(10, n)):
                 st.write(f"### Qubit {i}")
                 st.write(f"**Alice Basis:** {viz_data['alice_bases'][i]}, **Alice Bit:** {viz_data['alice_bits'][i]}")
                 st.write(f"**Bob Basis:** {viz_data['bob_bases'][i]}")

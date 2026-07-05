@@ -6,7 +6,10 @@ from qiskit_aer import AerSimulator
 class Attack(ABC):
     @abstractmethod
     def apply(self, circuits, backend):
-        """Apply attack to the quantum circuits."""
+        """
+        Apply attack to the quantum circuits.
+        Returns a tuple of (new_circuits, intercepted_info).
+        """
         pass
 
 class InterceptResend(Attack):
@@ -40,7 +43,11 @@ class InterceptResend(Attack):
                 re_qc.h(0)
             new_circuits.append(re_qc)
 
-        return new_circuits
+        intercepted_info = {
+            "type": "Intercept-Resend",
+            "info_gain": 0.5  # Theoretically Eve gains 50% info on BB84
+        }
+        return new_circuits, intercepted_info
 
 class NoisyChannel(Attack):
     def __init__(self, noise_level=0.1):
@@ -54,7 +61,12 @@ class NoisyChannel(Attack):
                 # Use Y-gate for basis-independent noise (flips both Z and X)
                 noisy_qc.y(0)
             new_circuits.append(noisy_qc)
-        return new_circuits
+
+        intercepted_info = {
+            "type": "Noisy Channel",
+            "info_gain": 0.0 # Random noise doesn't necessarily give Eve info
+        }
+        return new_circuits, intercepted_info
 
 class PhotonNumberSplitting(Attack):
     def apply(self, circuits, backend=None):
@@ -65,4 +77,9 @@ class PhotonNumberSplitting(Attack):
             if random.random() < 0.02:
                 noisy_qc.x(0)
             new_circuits.append(noisy_qc)
-        return new_circuits
+
+        intercepted_info = {
+            "type": "Photon Number Splitting",
+            "info_gain": 0.25 # Eve gains some info on multi-photon pulses
+        }
+        return new_circuits, intercepted_info

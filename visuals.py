@@ -1,4 +1,6 @@
 import streamlit.components.v1 as components
+import matplotlib.pyplot as plt
+from qiskit.quantum_info import Statevector
 
 def bloch_sphere(state_vector=[1, 0, 0], height=500):
     """
@@ -91,11 +93,49 @@ def bloch_sphere(state_vector=[1, 0, 0], height=500):
     """
     return components.html(html_code, height=height)
 
+def get_bloch_coordinates(qc):
+    """
+    Calculates the Bloch sphere coordinates [x, y, z] for a 1-qubit circuit.
+    """
+    try:
+        sv = Statevector.from_instruction(qc)
+        # sv.data returns the state vector as a numpy array [c0, c1]
+        # x = 2*Re(c0* conj(c1))
+        # y = 2*Im(conj(c0)* c1)
+        # z = |c0|^2 - |c1|^2
+        # Statevector has a convenient method: expect
+        from qiskit.quantum_info import Pauli
+        x = sv.expectation_value(Pauli('X')).real
+        y = sv.expectation_value(Pauli('Y')).real
+        z = sv.expectation_value(Pauli('Z')).real
+        return [x, y, z]
+    except Exception:
+        return [0, 0, 1] # Default to |0>
+
 def draw_circuit_visual(qc):
     """
     Returns a matplotlib figure of the quantum circuit.
     """
     return qc.draw(output='mpl')
+
+def plot_bit_differences(key_a, key_b):
+    diffs = [int(a != b) for a, b in zip(key_a, key_b)]
+    fig, ax = plt.subplots(figsize=(10, 2))
+    ax.plot(diffs, marker='o', color='red', label='Mismatch')
+    ax.set_title('Bit Differences (1 = Error)')
+    ax.set_xlabel('Bit Index')
+    ax.set_ylabel('Difference')
+    ax.grid(True)
+    return fig
+
+def plot_qber_bar(qber):
+    fig, ax = plt.subplots()
+    correct = 100 * (1 - qber)
+    incorrect = 100 * qber
+    ax.bar(['Correct', 'Incorrect'], [correct, incorrect], color=['green', 'red'])
+    ax.set_title(f'QBER: {qber * 100:.2f}%')
+    ax.set_ylim(0, 100)
+    return fig
 
 def photon_transmission(n_photons=10, height=300):
     html_code = f"""
