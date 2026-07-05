@@ -5,16 +5,15 @@ class SimulationEngine:
     Orchestrates the QKD simulation flow, decoupling the protocol logic from the UI.
     """
     def run(self, protocol, n, attack=None, backend=None, callback=None):
-        def log(msg):
+        def log(msg, progress=None):
             if callback:
                 try:
-                    # Streamlit status.update only accepts keyword arguments for label
-                    # But we try to handle general callbacks here
-                    callback(msg)
+                    # We expect the callback to handle (msg, progress)
+                    callback(msg, progress)
                 except Exception:
                     pass
 
-        log(f"Initializing {protocol.name} simulation with {n} qubits...")
+        log(f"Initializing {protocol.name} simulation with {n} qubits...", 0.1)
 
         # Alice's side: bit and basis generation
         alice_bits = protocol.generate_bits(n)
@@ -22,31 +21,41 @@ class SimulationEngine:
 
         # Encoding into quantum circuits
         circuits = protocol.encode(alice_bits, alice_bases)
-        log("Quantum states encoded.")
+        log("Quantum states encoded.", 0.3)
 
         # Optional Eavesdropper/Channel Attack
+        eve_info_gain = 0.0
         if attack:
-            log(f"Applying {type(attack).__name__} attack to the channel...")
-            intercepted_circuits = attack.apply(circuits, backend)
+            log(f"Applying {type(attack).__name__} attack to the channel...", 0.4)
+            intercepted_circuits, intercepted_info = attack.apply(circuits, backend)
+            eve_info_gain = intercepted_info.get('info_gain', 0.0)
         else:
             intercepted_circuits = circuits
 
         # Bob's side: basis generation and measurement
         bob_bases = protocol.generate_bases(n)
-        log("Bob is measuring the received qubits...")
+        log("Bob is measuring the received qubits...", 0.6)
         bob_results, meas_circuits = protocol.measure(intercepted_circuits, bob_bases, backend)
 
         # Sifting process (reconciling keys over classical channel)
-        log("Performing key sifting...")
+        log("Performing key sifting...", 0.8)
         key_a, key_b, indices = protocol.sift(alice_bases, bob_bases, alice_bits, bob_results)
 
         # Error analysis and security verification
-        log("Analyzing Quantum Bit Error Rate (QBER)...")
+        log("Analyzing Quantum Bit Error Rate (QBER)...", 0.9)
         qber = calculate_qber(key_a, key_b)
         is_secure, security_status = analyze_security(qber)
-        report = generate_error_report(alice_bits, bob_results, alice_bases, bob_bases, key_a, key_b)
+        report = generate_error_report(
+            alice_bits=alice_bits,
+            bob_results=bob_results,
+            alice_bases=alice_bases,
+            bob_bases=bob_bases,
+            sifted_alice=key_a,
+            sifted_bob=key_b,
+            protocol_name=protocol.name
+        )
 
-        log("Simulation complete.")
+        log("Simulation complete.", 1.0)
         return {
             "protocol_name": protocol.name,
             "alice_bits": alice_bits,
@@ -61,5 +70,6 @@ class SimulationEngine:
             "security_status": security_status,
             "report": report,
             "alice_circuits": circuits,
-            "bob_circuits": meas_circuits
+            "bob_circuits": meas_circuits,
+            "eve_info_gain": eve_info_gain
         }

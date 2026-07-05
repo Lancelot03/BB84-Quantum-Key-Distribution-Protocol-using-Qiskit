@@ -16,6 +16,7 @@ def test_engine_bb84_no_attack():
     assert len(results['bob_circuits']) == n
     assert results['qber'] == 0.0
     assert results['is_secure'] is True
+    assert results['eve_info_gain'] == 0.0
 
 def test_engine_b92_no_attack():
     engine = SimulationEngine()
@@ -41,16 +42,19 @@ def test_engine_bb84_intercept_resend():
     # QBER should be around 25% with Intercept-Resend on BB84
     assert results['qber'] > 0.1
     assert results['is_secure'] is False
+    assert results['eve_info_gain'] == 0.5
 
 def test_engine_callback():
     messages = []
-    def callback(msg):
-        messages.append(msg)
+    def callback(msg, progress):
+        messages.append((msg, progress))
 
     engine = SimulationEngine()
     protocol = BB84Protocol()
     engine.run(protocol, 10, callback=callback)
 
     assert len(messages) > 0
-    assert "Initializing BB84 simulation" in messages[0]
-    assert "Simulation complete." in messages[-1]
+    assert "Initializing BB84 simulation" in messages[0][0]
+    assert messages[0][1] == 0.1
+    assert "Simulation complete." in messages[-1][0]
+    assert messages[-1][1] == 1.0
