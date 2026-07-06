@@ -6,7 +6,7 @@ try:
 except ImportError:
     QiskitRuntimeService = None
 import matplotlib.pyplot as plt
-from visuals import bloch_sphere, photon_transmission, basis_matching_visual, draw_circuit_visual
+from visuals import bloch_sphere, photon_transmission, basis_matching_visual, draw_circuit_visual, get_bloch_coordinates
 from core import (
     BB84Protocol,
     B92Protocol,
@@ -91,14 +91,22 @@ with tab1:
             else:
                 attack = PhotonNumberSplitting()
 
+        # Progress Bar and Status
+        progress_bar = st.progress(0.0)
+
         # Run Simulation with UI status updates
         with st.status("🚀 Simulation in Progress...") as status:
+            def simulation_callback(msg, progress=None):
+                status.update(label=msg)
+                if progress is not None:
+                    progress_bar.progress(progress)
+
             viz_data = engine.run(
                 protocol=protocol,
                 n=n,
                 attack=attack,
                 backend=backend,
-                callback=lambda msg: status.update(label=msg)
+                callback=simulation_callback
             )
             status.update(label="✅ Simulation Complete!", state="complete", expanded=False)
 
@@ -113,17 +121,24 @@ with tab1:
             st.success("✅ Low QBER. Communication likely secure.")
 
         # Real-time Circuit Display
-        st.subheader("🛠️ Quantum Circuits (First Qubit)")
-        col_c1, col_c2 = st.columns(2)
-        with col_c1:
-            st.markdown("**Alice's Encoding Circuit**")
-            st.pyplot(draw_circuit_visual(viz_data['alice_circuits'][0]))
-        with col_c2:
-            st.markdown("**Bob's Measurement Circuit**")
-            st.pyplot(draw_circuit_visual(viz_data['bob_circuits'][0]))
+        st.subheader("🛠️ Real-time Quantum Circuit & State Visualization")
 
-        with st.expander("🛠️ Quantum Circuit Preview (First 5 Qubits)"):
-            for i in range(min(5, n)):
+        for i in range(min(3, n)):
+            st.markdown(f"#### Qubit {i}")
+            col_c1, col_c2 = st.columns(2)
+            with col_c1:
+                st.markdown(f"**Alice's Encoding** (Basis: {viz_data['alice_bases'][i]}, Bit: {viz_data['alice_bits'][i]})")
+                st.pyplot(draw_circuit_visual(viz_data['alice_circuits'][i]))
+                coords = get_bloch_coordinates(viz_data['alice_circuits'][i])
+                bloch_sphere(coords, height=300)
+            with col_c2:
+                st.markdown(f"**Bob's Measurement** (Basis: {viz_data['bob_bases'][i]})")
+                st.pyplot(draw_circuit_visual(viz_data['bob_circuits'][i]))
+                coords = get_bloch_coordinates(viz_data['bob_circuits'][i])
+                bloch_sphere(coords, height=300)
+
+        with st.expander("🛠️ Quantum Circuit Preview (First 10 Qubits)"):
+            for i in range(min(10, n)):
                 st.write(f"### Qubit {i}")
                 st.write(f"**Alice Basis:** {viz_data['alice_bases'][i]}, **Alice Bit:** {viz_data['alice_bits'][i]}")
                 st.write(f"**Bob Basis:** {viz_data['bob_bases'][i]}")

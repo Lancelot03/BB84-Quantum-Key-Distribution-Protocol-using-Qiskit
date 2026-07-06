@@ -40,7 +40,11 @@ class InterceptResend(Attack):
                 re_qc.h(0)
             new_circuits.append(re_qc)
 
-        return new_circuits
+        intercepted_info = {
+            'type': 'Intercept-Resend',
+            'info_gain': 0.5
+        }
+        return new_circuits, intercepted_info
 
 class NoisyChannel(Attack):
     def __init__(self, noise_level=0.1):
@@ -54,7 +58,12 @@ class NoisyChannel(Attack):
                 # Use Y-gate for basis-independent noise (flips both Z and X)
                 noisy_qc.y(0)
             new_circuits.append(noisy_qc)
-        return new_circuits
+
+        intercepted_info = {
+            'type': 'Noisy Channel',
+            'info_gain': 0.0
+        }
+        return new_circuits, intercepted_info
 
 class PhotonNumberSplitting(Attack):
     def apply(self, circuits, backend=None):
@@ -65,4 +74,9 @@ class PhotonNumberSplitting(Attack):
             if random.random() < 0.02:
                 noisy_qc.x(0)
             new_circuits.append(noisy_qc)
-        return new_circuits
+
+        intercepted_info = {
+            'type': 'Photon Number Splitting',
+            'info_gain': 0.25
+        }
+        return new_circuits, intercepted_info
