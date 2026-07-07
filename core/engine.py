@@ -1,4 +1,6 @@
 from core.stats import calculate_qber, analyze_security, generate_error_report
+from core.reconciliation import CascadeReconciler
+from core.privacy import PrivacyAmplifier
 
 class SimulationEngine:
     """
@@ -45,10 +47,35 @@ class SimulationEngine:
         key_a, key_b, indices = protocol.sift(alice_bases, bob_bases, alice_bits, bob_results)
 
         # Error analysis and security verification
-        log("Analyzing Quantum Bit Error Rate (QBER)...", 0.9)
+        log("Analyzing Quantum Bit Error Rate (QBER)...", 0.85)
         qber = calculate_qber(key_a, key_b)
         is_secure, security_status = analyze_security(qber)
+
+        # Phase 2: Post-Processing
+        reconciled_key_b = key_b
+        errors_fixed = 0
+        final_key_a = key_a
+        final_key_b = reconciled_key_b
+
+        if is_secure:
+            log("Starting Information Reconciliation...", 0.9)
+            reconciler = CascadeReconciler()
+            reconciled_key_b, errors_fixed = reconciler.reconcile(key_a, key_b)
+
+            log("Starting Privacy Amplification...", 0.95)
+            amplifier = PrivacyAmplifier()
+            final_key_a = amplifier.amplify(key_a, qber)
+            final_key_b = amplifier.amplify(reconciled_key_b, qber)
+
+        from core.stats import calculate_info_leakage
+        leakage = calculate_info_leakage(qber, eve_info_gain)
+
         report = generate_error_report(alice_bits, bob_results, alice_bases, bob_bases, key_a, key_b, qber, protocol.name)
+        report['info_leakage'] = leakage
+        if is_secure:
+            report['errors_fixed'] = errors_fixed
+            report['final_key_length'] = len(final_key_a)
+            report['secret_key_rate'] = len(final_key_a) / n if n > 0 else 0
 
         log("Simulation complete.", 1.0)
         return {
@@ -59,6 +86,9 @@ class SimulationEngine:
             "bob_results": bob_results,
             "key_a": key_a,
             "key_b": key_b,
+            "reconciled_key_b": reconciled_key_b,
+            "final_key_a": final_key_a,
+            "final_key_b": final_key_b,
             "indices": indices,
             "qber": qber,
             "is_secure": is_secure,

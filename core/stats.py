@@ -5,10 +5,25 @@ def calculate_qber(alice_key, bob_key):
     errors = sum(a != b for a, b in zip(alice_key, bob_key))
     return errors / len(alice_key)
 
+import math
+
 def analyze_security(qber, threshold=0.11):
     """Determine if the communication is secure based on QBER."""
     is_secure = qber <= threshold
     return is_secure, "Secure" if is_secure else "Compromised"
+
+def calculate_info_leakage(qber, info_gain_eve):
+    """
+    Estimate information leakage to Eve.
+    Simplified model based on QBER and Eve's direct info gain.
+    """
+    def h(p):
+        if p <= 0 or p >= 1:
+            return 0
+        return -p * math.log2(p) - (1-p) * math.log2(1-p)
+
+    leakage = h(qber) + info_gain_eve
+    return min(1.0, leakage)
 
 def generate_error_report(alice_bits, bob_results, alice_bases, bob_bases, sifted_alice, sifted_bob, qber, protocol_name):
     """

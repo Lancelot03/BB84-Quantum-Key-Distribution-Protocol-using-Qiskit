@@ -120,6 +120,24 @@ with tab1:
         else:
             st.success("✅ Low QBER. Communication likely secure.")
 
+            with st.expander("🔐 Post-Processing Details (Error Correction & Privacy Amplification)"):
+                st.subheader("🛠️ Information Reconciliation (Cascade)")
+                st.write(f"Errors corrected by Bob: `{viz_data['report'].get('errors_fixed', 0)}` bits")
+                st.text(f"Alice's Reconciled Key: {''.join(map(str, viz_data['key_a']))}")
+                st.text(f"Bob's Reconciled Key:   {''.join(map(str, viz_data['reconciled_key_b']))}")
+
+                st.subheader("🛡️ Privacy Amplification")
+                st.write(f"Key compressed by factor of: `{viz_data['report'].get('final_key_length', 0) / len(viz_data['key_a']) if len(viz_data['key_a']) > 0 else 0:.2f}`")
+                st.markdown(f"**Final Shared Secret Key (Alice):**")
+                st.code(''.join(map(str, viz_data['final_key_a'])))
+                st.markdown(f"**Final Shared Secret Key (Bob):**")
+                st.code(''.join(map(str, viz_data['final_key_b'])))
+
+                if viz_data['final_key_a'] == viz_data['final_key_b']:
+                    st.success("✅ Perfect Key Match!")
+                else:
+                    st.error("❌ Key Mismatch! Reconciliation failed.")
+
         # Real-time Circuit Display
         st.subheader("🛠️ Real-time Quantum Circuit & State Visualization")
 
@@ -152,10 +170,18 @@ with tab1:
 
         if viz_data['report']:
             st.subheader("📊 Detailed Error Analysis")
-            col1, col2, col3 = st.columns(3)
+            col1, col2, col3, col4 = st.columns(4)
             col1.metric("Sifting Efficiency", f"{viz_data['report']['basis_match_efficiency']:.1f}%")
-            col2.metric("Z-Basis Error Rate", f"{viz_data['report']['z_error_rate']*100:.1f}%")
-            col3.metric("X-Basis Error Rate", f"{viz_data['report']['x_error_rate']*100:.1f}%")
+            col2.metric("Z-Basis Error", f"{viz_data['report']['z_error_rate']*100:.1f}%")
+            col3.metric("X-Basis Error", f"{viz_data['report']['x_error_rate']*100:.1f}%")
+            col4.metric("Info Leakage", f"{viz_data['report']['info_leakage']*100:.1f}%")
+
+            if viz_data['is_secure']:
+                st.subheader("🛡️ Security Performance")
+                m1, m2, m3 = st.columns(3)
+                m1.metric("Final Key Length", f"{viz_data['report']['final_key_length']} bits")
+                m2.metric("Secret Key Rate", f"{viz_data['report']['secret_key_rate']*100:.1f}%")
+                m3.metric("Errors Fixed", f"{viz_data['report']['errors_fixed']}")
 
         st.subheader("🔍 Basis Matching")
         basis_matching_visual(viz_data['alice_bases'][:20], viz_data['bob_bases'][:20])
