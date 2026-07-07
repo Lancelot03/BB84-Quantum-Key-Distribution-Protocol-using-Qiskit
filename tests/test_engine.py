@@ -44,7 +44,7 @@ def test_engine_bb84_intercept_resend():
 
 def test_engine_callback():
     messages = []
-    def callback(msg):
+    def callback(msg, progress=None):
         messages.append(msg)
 
     engine = SimulationEngine()
