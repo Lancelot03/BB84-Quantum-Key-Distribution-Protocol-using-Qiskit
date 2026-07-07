@@ -1,6 +1,7 @@
 import streamlit.components.v1 as components
 from qiskit.quantum_info import Statevector
 import numpy as np
+import matplotlib.pyplot as plt
 
 def get_bloch_coordinates(qc):
     """
@@ -108,6 +109,31 @@ def bloch_sphere(state_vector=[1, 0, 0], height=500):
     </html>
     """
     return components.html(html_code, height=height)
+
+def plot_bit_differences(key_a, key_b):
+    """
+    Returns a matplotlib figure showing bit differences.
+    """
+    diffs = [int(a != b) for a, b in zip(key_a, key_b)]
+    fig, ax = plt.subplots(figsize=(10, 2))
+    ax.plot(diffs, marker='o', color='red', label='Mismatch')
+    ax.set_title('Bit Differences (1 = Error)')
+    ax.set_xlabel('Bit Index')
+    ax.set_ylabel('Difference')
+    ax.grid(True)
+    return fig
+
+def plot_qber_bar(qber):
+    """
+    Returns a bar chart showing the QBER.
+    """
+    fig, ax = plt.subplots()
+    correct = 100 * (1 - qber)
+    incorrect = 100 * qber
+    ax.bar(['Correct', 'Incorrect'], [correct, incorrect], color=['green', 'red'])
+    ax.set_title(f'QBER: {qber * 100:.2f}%')
+    ax.set_ylim(0, 100)
+    return fig
 
 def draw_circuit_visual(qc):
     """

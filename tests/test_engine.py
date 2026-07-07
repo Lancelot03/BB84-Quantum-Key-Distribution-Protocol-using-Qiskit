@@ -39,7 +39,8 @@ def test_engine_bb84_intercept_resend():
 
     assert results['protocol_name'] == "BB84"
     # QBER should be around 25% with Intercept-Resend on BB84
-    assert results['qber'] > 0.1
+    # With n=100, we expect qber to be in range [0.10, 0.45]
+    assert 0.10 <= results['qber'] <= 0.45
     assert results['is_secure'] is False
 
 def test_engine_callback():
