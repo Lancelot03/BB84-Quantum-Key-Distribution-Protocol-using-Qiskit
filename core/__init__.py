@@ -3,3 +3,5 @@ from .b92 import B92Protocol
 from .attacks import InterceptResend, NoisyChannel, PhotonNumberSplitting
 from .stats import calculate_qber, analyze_security, generate_error_report
 from .engine import SimulationEngine
+from .reconciliation import CascadeReconciler
+from .privacy import PrivacyAmplifier
