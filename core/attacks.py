@@ -10,15 +10,24 @@ class Attack(ABC):
         pass
 
 class InterceptResend(Attack):
+    def __init__(self, intercept_probability=1.0):
+        self.intercept_probability = intercept_probability
+
     def apply(self, circuits, backend=None):
         if backend is None:
             backend = AerSimulator()
 
-        # Eve measures in a random basis
-        eve_bases = [random.choice(['Z', 'X']) for _ in range(len(circuits))]
+        # Decide which qubits Eve intercepts
+        indices_to_intercept = [i for i in range(len(circuits)) if random.random() < self.intercept_probability]
+
+        if not indices_to_intercept:
+            return [qc.copy() for qc in circuits], {'type': 'Intercept-Resend', 'info_gain': 0.0}
+
+        # Eve measures in a random basis only for intercepted qubits
+        eve_bases = {i: random.choice(['Z', 'X']) for i in indices_to_intercept}
         meas_circuits = []
-        for i, qc in enumerate(circuits):
-            eve_qc = qc.copy()
+        for i in indices_to_intercept:
+            eve_qc = circuits[i].copy()
             if eve_bases[i] == 'X':
                 eve_qc.h(0)
             eve_qc.measure(0, 0)
@@ -30,19 +39,24 @@ class InterceptResend(Attack):
         result_data = job.result()
 
         new_circuits = []
+        meas_idx = 0
         for i in range(len(circuits)):
-            res = int(result_data.get_memory(i)[0])
-            # Re-encode to send to Bob
-            re_qc = QuantumCircuit(1, 1)
-            if res == 1:
-                re_qc.x(0)
-            if eve_bases[i] == 'X':
-                re_qc.h(0)
-            new_circuits.append(re_qc)
+            if i in indices_to_intercept:
+                res = int(result_data.get_memory(meas_idx)[0])
+                meas_idx += 1
+                # Re-encode to send to Bob
+                re_qc = QuantumCircuit(1, 1)
+                if res == 1:
+                    re_qc.x(0)
+                if eve_bases[i] == 'X':
+                    re_qc.h(0)
+                new_circuits.append(re_qc)
+            else:
+                new_circuits.append(circuits[i].copy())
 
         intercepted_info = {
             'type': 'Intercept-Resend',
-            'info_gain': 0.5
+            'info_gain': 0.5 * self.intercept_probability
         }
         return new_circuits, intercepted_info
 
@@ -67,13 +81,11 @@ class NoisyChannel(Attack):
 
 class PhotonNumberSplitting(Attack):
     def apply(self, circuits, backend=None):
-        new_circuits = []
-        for qc in circuits:
-            noisy_qc = qc.copy()
-            # PNS is typically very subtle, but we simulate some minimal disturbance
-            if random.random() < 0.02:
-                noisy_qc.x(0)
-            new_circuits.append(noisy_qc)
+        """
+        In a PNS attack, Eve gains information from multi-photon pulses
+        without disturbing the quantum state, thus introducing no errors (QBER = 0).
+        """
+        new_circuits = [qc.copy() for qc in circuits]
 
         intercepted_info = {
             'type': 'Photon Number Splitting',

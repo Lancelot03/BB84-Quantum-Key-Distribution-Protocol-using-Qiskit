@@ -96,5 +96,6 @@ class SimulationEngine:
             "report": report,
             "alice_circuits": circuits,
             "bob_circuits": meas_circuits,
+            "received_circuits": intercepted_circuits,
             "eve_info_gain": eve_info_gain
         }
