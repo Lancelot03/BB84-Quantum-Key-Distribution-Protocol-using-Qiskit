@@ -1,6 +1,32 @@
 import streamlit.components.v1 as components
 from qiskit.quantum_info import Statevector
 import numpy as np
+import matplotlib.pyplot as plt
+
+def plot_bit_differences(key_a, key_b):
+    """
+    Returns a matplotlib figure showing bit differences between Alice and Bob's keys.
+    """
+    diffs = [int(a != b) for a, b in zip(key_a, key_b)]
+    fig, ax = plt.subplots(figsize=(10, 2))
+    ax.plot(diffs, marker='o', color='red', label='Mismatch')
+    ax.set_title('Bit Differences (1 = Error)')
+    ax.set_xlabel('Bit Index')
+    ax.set_ylabel('Difference')
+    ax.grid(True)
+    return fig
+
+def plot_qber_bar(qber):
+    """
+    Returns a bar chart figure showing QBER.
+    """
+    fig, ax = plt.subplots()
+    correct = 100 * (1 - qber)
+    incorrect = 100 * qber
+    ax.bar(['Correct', 'Incorrect'], [correct, incorrect], color=['green', 'red'])
+    ax.set_title(f'QBER: {qber * 100:.2f}%')
+    ax.set_ylim(0, 100)
+    return fig
 
 def get_bloch_coordinates(qc):
     """
@@ -115,7 +141,27 @@ def draw_circuit_visual(qc):
     """
     return qc.draw(output='mpl')
 
-def photon_transmission(n_photons=10, height=300):
+def photon_transmission(n_photons=10, height=300, eve_present=False):
+    eve_html = """
+        <div class="eve">Eve</div>
+        <style>
+            .eve {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                color: #ff4b4b;
+                font-family: sans-serif;
+                font-weight: bold;
+                padding: 10px;
+                border: 2px solid #ff4b4b;
+                border-radius: 50%;
+                background: #222;
+                z-index: 10;
+            }
+        </style>
+    """ if eve_present else ""
+
     html_code = f"""
     <!DOCTYPE html>
     <html>
@@ -158,6 +204,7 @@ def photon_transmission(n_photons=10, height=300):
     <body>
         <div class="alice">Alice</div>
         <div class="bob">Bob</div>
+        {eve_html}
         <div id="photons-container"></div>
         <script>
             const container = document.getElementById('photons-container');
