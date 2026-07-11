@@ -6,11 +6,23 @@ class SimulationEngine:
     """
     Orchestrates the QKD simulation flow, decoupling the protocol logic from the UI.
     """
-    def run(self, protocol, n, attack=None, backend=None, callback=None):
+    def run(self, protocol, n: int, attack=None, backend=None, callback=None) -> dict:
+        """
+        Executes the end-to-end QKD simulation.
+
+        Args:
+            protocol: An instance of QKDProtocol (e.g., BB84Protocol).
+            n: Number of qubits to simulate.
+            attack: Optional Attack instance (e.g., InterceptResend).
+            backend: Qiskit backend (defaults to AerSimulator).
+            callback: Function for progress updates.
+
+        Returns:
+            A dictionary containing full simulation results and metadata.
+        """
         def log(msg, progress=None):
             if callback:
                 try:
-                    # Enhanced callback to handle progress reporting
                     if progress is not None:
                         callback(msg, progress)
                     else:
@@ -32,15 +44,16 @@ class SimulationEngine:
         eve_info_gain = 0.0
         if attack:
             log(f"Applying {type(attack).__name__} attack to the channel...", 0.4)
-            intercepted_circuits, intercepted_info = attack.apply(circuits, backend)
+            received_circuits, intercepted_info = attack.apply(circuits, backend)
             eve_info_gain = intercepted_info.get('info_gain', 0.0)
         else:
-            intercepted_circuits = circuits
+            # Deep copy to ensure independence if no attack
+            received_circuits = [qc.copy() for qc in circuits]
 
         # Bob's side: basis generation and measurement
         bob_bases = protocol.generate_bases(n)
         log("Bob is measuring the received qubits...", 0.6)
-        bob_results, meas_circuits = protocol.measure(intercepted_circuits, bob_bases, backend)
+        bob_results, meas_circuits = protocol.measure(received_circuits, bob_bases, backend)
 
         # Sifting process (reconciling keys over classical channel)
         log("Performing key sifting...", 0.8)
@@ -51,7 +64,7 @@ class SimulationEngine:
         qber = calculate_qber(key_a, key_b)
         is_secure, security_status = analyze_security(qber)
 
-        # Phase 2: Post-Processing
+        # Post-Processing
         reconciled_key_b = key_b
         errors_fixed = 0
         final_key_a = key_a
@@ -96,5 +109,6 @@ class SimulationEngine:
             "report": report,
             "alice_circuits": circuits,
             "bob_circuits": meas_circuits,
+            "received_circuits": received_circuits,
             "eve_info_gain": eve_info_gain
         }

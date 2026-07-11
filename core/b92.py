@@ -5,21 +5,31 @@ from core.protocol import QKDProtocol
 from core import stats
 
 class B92Protocol(QKDProtocol):
+    """
+    Implementation of the B92 Quantum Key Distribution protocol.
+    """
     @property
-    def name(self):
+    def name(self) -> str:
         return "B92"
 
-    def generate_bits(self, n):
+    def generate_bits(self, n: int) -> list[int]:
+        """Generate n random bits."""
         return [random.randint(0, 1) for _ in range(n)]
 
-    def generate_alice_bases(self, n):
+    def generate_alice_bases(self, n: int) -> list[str]:
+        """In B92, Alice uses a single encoding scheme."""
         return ["B92"] * n
 
-    def generate_bases(self, n):
-        # In B92, Bob chooses between Z and X bases for measurement
+    def generate_bases(self, n: int) -> list[str]:
+        """In B92, Bob randomly chooses between Z and X bases for measurement."""
         return [random.choice(['Z', 'X']) for _ in range(n)]
 
-    def encode(self, bits, bases=None):
+    def encode(self, bits: list[int], bases: list[str] = None) -> list[QuantumCircuit]:
+        """
+        Encodes bits into non-orthogonal states:
+        - Bit 0 -> |0>
+        - Bit 1 -> |+>
+        """
         # bases is ignored in B92 for Alice's encoding
         circuits = []
         for bit in bits:
@@ -30,7 +40,7 @@ class B92Protocol(QKDProtocol):
             circuits.append(qc)
         return circuits
 
-    def measure(self, circuits, bases, backend=None):
+    def measure(self, circuits: list[QuantumCircuit], bases: list[str], backend=None) -> tuple[list[int], list[QuantumCircuit]]:
         if backend is None:
             backend = AerSimulator()
 
@@ -52,8 +62,10 @@ class B92Protocol(QKDProtocol):
             results.append(int(mem[0]))
         return results, meas_circuits
 
-    def sift(self, alice_bases, bob_bases, alice_bits, bob_bits):
-        # Sifting for B92: Bob only keeps bits where he got "1" (conclusive result)
+    def sift(self, alice_bases: list[str], bob_bases: list[str], alice_bits: list[int], bob_bits: list[int]) -> tuple[list[int], list[int], list[int]]:
+        """
+        Sifting for B92: Bob only keeps bits where he got "1" (conclusive result).
+        """
         sifted_a, sifted_b = [], []
         indices = []
         for i in range(len(bob_bits)):

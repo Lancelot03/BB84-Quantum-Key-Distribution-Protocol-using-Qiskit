@@ -4,20 +4,33 @@ from qiskit_aer import AerSimulator
 from core.protocol import QKDProtocol
 
 class BB84Protocol(QKDProtocol):
+    """
+    Implementation of the BB84 Quantum Key Distribution protocol.
+    """
     @property
-    def name(self):
+    def name(self) -> str:
         return "BB84"
 
-    def generate_bits(self, n):
+    def generate_bits(self, n: int) -> list[int]:
+        """Generate n random bits."""
         return [random.randint(0, 1) for _ in range(n)]
 
-    def generate_alice_bases(self, n):
+    def generate_alice_bases(self, n: int) -> list[str]:
+        """Generate n random bases ('Z' or 'X') for Alice."""
         return [random.choice(['Z', 'X']) for _ in range(n)]
 
-    def generate_bases(self, n):
+    def generate_bases(self, n: int) -> list[str]:
+        """Generate n random bases ('Z' or 'X') for Bob."""
         return [random.choice(['Z', 'X']) for _ in range(n)]
 
-    def encode(self, bits, bases):
+    def encode(self, bits: list[int], bases: list[str]) -> list[QuantumCircuit]:
+        """
+        Encodes bits into qubits using the BB84 protocol.
+        - Bit 0, Z basis -> |0>
+        - Bit 1, Z basis -> |1>
+        - Bit 0, X basis -> |+>
+        - Bit 1, X basis -> |->
+        """
         circuits = []
         for bit, base in zip(bits, bases):
             qc = QuantumCircuit(1, 1)
@@ -28,7 +41,7 @@ class BB84Protocol(QKDProtocol):
             circuits.append(qc)
         return circuits
 
-    def measure(self, circuits, bases, backend=None):
+    def measure(self, circuits: list[QuantumCircuit], bases: list[str], backend=None) -> tuple[list[int], list[QuantumCircuit]]:
         if backend is None:
             backend = AerSimulator()
 
@@ -55,7 +68,10 @@ class BB84Protocol(QKDProtocol):
 
         return results, meas_circuits
 
-    def sift(self, alice_bases, bob_bases, alice_bits, bob_bits):
+    def sift(self, alice_bases: list[str], bob_bases: list[str], alice_bits: list[int], bob_bits: list[int]) -> tuple[list[int], list[int], list[int]]:
+        """
+        Keeps bits only where Alice and Bob used the same basis.
+        """
         sifted_a, sifted_b = [], []
         indices = []
         for i in range(len(alice_bits)):

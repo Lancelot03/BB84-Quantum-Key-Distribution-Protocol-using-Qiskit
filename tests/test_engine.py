@@ -33,7 +33,7 @@ def test_engine_b92_no_attack():
 def test_engine_bb84_intercept_resend():
     engine = SimulationEngine()
     protocol = BB84Protocol()
-    attack = InterceptResend()
+    attack = InterceptResend(intercept_probability=1.0)
     n = 100
     results = engine.run(protocol, n, attack=attack)
 
