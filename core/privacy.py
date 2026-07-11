@@ -12,7 +12,7 @@ class PrivacyAmplifier:
         """
         self.compression_factor = compression_factor
 
-    def amplify(self, key, qber=None):
+    def amplify(self, key: list[int], qber: float = None) -> list[int]:
         """
         Compress the key using a hash function.
         Returns the amplified key as a list of bits.

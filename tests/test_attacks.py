@@ -5,7 +5,7 @@ from qiskit_aer import AerSimulator
 
 def test_intercept_resend():
     protocol = BB84Protocol()
-    attack = InterceptResend()
+    attack = InterceptResend(intercept_probability=1.0)
     backend = AerSimulator()
     n = 100
 

@@ -8,7 +8,7 @@ class CascadeReconciler:
     def __init__(self, block_size=None):
         self.block_size = block_size
 
-    def reconcile(self, alice_key, bob_key):
+    def reconcile(self, alice_key: list[int], bob_key: list[int]) -> tuple[list[int], int]:
         """
         Attempt to reconcile bob_key to match alice_key using parity checks.
         Returns (corrected_bob_key, num_errors_fixed).
