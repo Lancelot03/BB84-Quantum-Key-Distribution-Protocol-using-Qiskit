@@ -6,7 +6,15 @@ try:
 except ImportError:
     QiskitRuntimeService = None
 import matplotlib.pyplot as plt
-from visuals import bloch_sphere, photon_transmission, basis_matching_visual, draw_circuit_visual, get_bloch_coordinates
+from visuals import (
+    bloch_sphere,
+    photon_transmission,
+    basis_matching_visual,
+    draw_circuit_visual,
+    get_bloch_coordinates,
+    plot_bit_differences,
+    plot_qber_bar
+)
 from core import (
     BB84Protocol,
     B92Protocol,
@@ -30,26 +38,6 @@ def get_backend(use_hardware=False, api_key=""):
             return AerSimulator()
     else:
         return AerSimulator()
-
-# Plotting Functions
-def plot_bit_differences(key_a, key_b):
-    diffs = [int(a != b) for a, b in zip(key_a, key_b)]
-    fig, ax = plt.subplots(figsize=(10, 2))
-    ax.plot(diffs, marker='o', color='red', label='Mismatch')
-    ax.set_title('Bit Differences (1 = Error)')
-    ax.set_xlabel('Bit Index')
-    ax.set_ylabel('Difference')
-    ax.grid(True)
-    return fig
-
-def plot_qber_bar(qber):
-    fig, ax = plt.subplots()
-    correct = 100 * (1 - qber)
-    incorrect = 100 * qber
-    ax.bar(['Correct', 'Incorrect'], [correct, incorrect], color=['green', 'red'])
-    ax.set_title(f'QBER: {qber * 100:.2f}%')
-    ax.set_ylim(0, 100)
-    return fig
 
 # --- Streamlit App ---
 st.set_page_config(page_title="Quantum Key Distribution Simulator", layout="wide")
@@ -85,7 +73,7 @@ with tab1:
         attack = None
         if eve_present:
             if attack_choice == "Intercept-Resend":
-                attack = InterceptResend()
+                attack = InterceptResend(noise_level)
             elif attack_choice == "Noisy Channel":
                 attack = NoisyChannel(noise_level)
             else:
@@ -150,9 +138,10 @@ with tab1:
                 coords = get_bloch_coordinates(viz_data['alice_circuits'][i])
                 bloch_sphere(coords, height=300)
             with col_c2:
-                st.markdown(f"**Bob's Measurement** (Basis: {viz_data['bob_bases'][i]})")
+                st.markdown(f"**Bob's Received State** (Basis: {viz_data['bob_bases'][i]})")
                 st.pyplot(draw_circuit_visual(viz_data['bob_circuits'][i]))
-                coords = get_bloch_coordinates(viz_data['bob_circuits'][i])
+                # Use received_circuits to show state BEFORE Bob's basis transformation
+                coords = get_bloch_coordinates(viz_data['received_circuits'][i])
                 bloch_sphere(coords, height=300)
 
         with st.expander("🛠️ Quantum Circuit Preview (First 10 Qubits)"):
