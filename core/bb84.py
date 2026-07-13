@@ -1,23 +1,52 @@
 import random
+from typing import List, Tuple, Any, Optional
 from qiskit import QuantumCircuit, transpile
 from qiskit_aer import AerSimulator
 from core.protocol import QKDProtocol
 
 class BB84Protocol(QKDProtocol):
+    """
+    Implementation of the BB84 Quantum Key Distribution protocol.
+    Uses two mutually unbiased bases: Z (|0>, |1>) and X (|+>, |->).
+    """
     @property
-    def name(self):
+    def name(self) -> str:
+        """The name of the protocol."""
         return "BB84"
 
-    def generate_bits(self, n):
+    def generate_bits(self, n: int) -> List[int]:
+        """
+        Generate random bits for Alice.
+
+        Args:
+            n: Number of bits to generate.
+
+        Returns:
+            A list of n random bits (0 or 1).
+        """
         return [random.randint(0, 1) for _ in range(n)]
 
-    def generate_alice_bases(self, n):
+    def generate_alice_bases(self, n: int) -> List[str]:
+        """
+        Generate random bases for Alice's encoding ('Z' or 'X').
+        """
         return [random.choice(['Z', 'X']) for _ in range(n)]
 
-    def generate_bases(self, n):
+    def generate_bases(self, n: int) -> List[str]:
+        """
+        Generate random bases for Bob's measurement ('Z' or 'X').
+        """
         return [random.choice(['Z', 'X']) for _ in range(n)]
 
-    def encode(self, bits, bases):
+    def encode(self, bits: List[int], bases: List[str]) -> List[QuantumCircuit]:
+        """
+        Encode bits into quantum circuits using BB84 rules.
+
+        0 + Z -> |0>
+        1 + Z -> |1>
+        0 + X -> |+>
+        1 + X -> |->
+        """
         circuits = []
         for bit, base in zip(bits, bases):
             qc = QuantumCircuit(1, 1)
@@ -28,7 +57,10 @@ class BB84Protocol(QKDProtocol):
             circuits.append(qc)
         return circuits
 
-    def measure(self, circuits, bases, backend=None):
+    def measure(self, circuits: List[QuantumCircuit], bases: List[str], backend: Optional[Any] = None) -> Tuple[List[int], List[QuantumCircuit]]:
+        """
+        Measure the quantum circuits using Bob's chosen bases.
+        """
         if backend is None:
             backend = AerSimulator()
 
@@ -48,14 +80,15 @@ class BB84Protocol(QKDProtocol):
 
         results = []
         for i in range(len(circuits)):
-            # Qiskit 1.0.2 memory access for batched jobs
-            # job.result().get_memory(i) returns the list of memory entries for the i-th circuit
             mem = result_data.get_memory(i)
             results.append(int(mem[0]))
 
         return results, meas_circuits
 
-    def sift(self, alice_bases, bob_bases, alice_bits, bob_bits):
+    def sift(self, alice_bases: List[str], bob_bases: List[str], alice_bits: List[int], bob_bits: List[int]) -> Tuple[List[int], List[int], List[int]]:
+        """
+        Perform key sifting: keep bits where Alice and Bob used the same basis.
+        """
         sifted_a, sifted_b = [], []
         indices = []
         for i in range(len(alice_bits)):
