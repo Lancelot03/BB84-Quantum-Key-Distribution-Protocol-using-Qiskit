@@ -1,20 +1,41 @@
+from typing import List, Dict, Any, Optional, Callable
 from core.stats import calculate_qber, analyze_security, generate_error_report
 from core.reconciliation import CascadeReconciler
 from core.privacy import PrivacyAmplifier
+from core.protocol import QKDProtocol
+from core.attacks import Attack
 
 class SimulationEngine:
     """
     Orchestrates the QKD simulation flow, decoupling the protocol logic from the UI.
     """
-    def run(self, protocol, n, attack=None, backend=None, callback=None):
-        def log(msg, progress=None):
+    def run(self,
+            protocol: QKDProtocol,
+            n: int,
+            attack: Optional[Attack] = None,
+            backend: Optional[Any] = None,
+            callback: Optional[Callable[[str, Optional[float]], None]] = None) -> Dict[str, Any]:
+        """
+        Run a full QKD simulation.
+
+        Args:
+            protocol: The QKD protocol implementation (e.g., BB84Protocol).
+            n: The number of qubits to simulate.
+            attack: Optional attack model to apply to the quantum channel.
+            backend: Optional Qiskit backend for simulation.
+            callback: Optional callback for progress reporting (message, progress_fraction).
+
+        Returns:
+            A dictionary containing simulation results and metadata.
+        """
+        def log(msg: str, progress: Optional[float] = None):
             if callback:
                 try:
                     # Enhanced callback to handle progress reporting
                     if progress is not None:
                         callback(msg, progress)
                     else:
-                        callback(msg)
+                        callback(msg, None)
                 except Exception:
                     pass
 
