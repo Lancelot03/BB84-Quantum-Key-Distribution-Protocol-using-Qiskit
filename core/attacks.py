@@ -10,15 +10,28 @@ class Attack(ABC):
         pass
 
 class InterceptResend(Attack):
+    def __init__(self, intercept_probability=1.0):
+        self.intercept_probability = intercept_probability
+
     def apply(self, circuits, backend=None):
         if backend is None:
             backend = AerSimulator()
 
-        # Eve measures in a random basis
-        eve_bases = [random.choice(['Z', 'X']) for _ in range(len(circuits))]
+        # Decide which qubits Eve intercepts
+        intercept_indices = [i for i in range(len(circuits)) if random.random() < self.intercept_probability]
+
+        if not intercept_indices:
+            intercepted_info = {
+                'type': 'Intercept-Resend',
+                'info_gain': 0.0
+            }
+            return [qc.copy() for qc in circuits], intercepted_info
+
+        # Eve measures only the intercepted qubits
+        eve_bases = {i: random.choice(['Z', 'X']) for i in intercept_indices}
         meas_circuits = []
-        for i, qc in enumerate(circuits):
-            eve_qc = qc.copy()
+        for i in intercept_indices:
+            eve_qc = circuits[i].copy()
             if eve_bases[i] == 'X':
                 eve_qc.h(0)
             eve_qc.measure(0, 0)
@@ -30,19 +43,25 @@ class InterceptResend(Attack):
         result_data = job.result()
 
         new_circuits = []
+        result_idx = 0
         for i in range(len(circuits)):
-            res = int(result_data.get_memory(i)[0])
-            # Re-encode to send to Bob
-            re_qc = QuantumCircuit(1, 1)
-            if res == 1:
-                re_qc.x(0)
-            if eve_bases[i] == 'X':
-                re_qc.h(0)
-            new_circuits.append(re_qc)
+            if i in intercept_indices:
+                res = int(result_data.get_memory(result_idx)[0])
+                result_idx += 1
+                # Re-encode to send to Bob
+                re_qc = QuantumCircuit(1, 1)
+                if res == 1:
+                    re_qc.x(0)
+                if eve_bases[i] == 'X':
+                    re_qc.h(0)
+                new_circuits.append(re_qc)
+            else:
+                # Pass through the original circuit
+                new_circuits.append(circuits[i].copy())
 
         intercepted_info = {
             'type': 'Intercept-Resend',
-            'info_gain': 0.5
+            'info_gain': self.intercept_probability * 0.5
         }
         return new_circuits, intercepted_info
 
