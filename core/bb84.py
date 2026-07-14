@@ -1,23 +1,32 @@
 import random
+from typing import List, Tuple, Optional, Any
 from qiskit import QuantumCircuit, transpile
 from qiskit_aer import AerSimulator
 from core.protocol import QKDProtocol
 
 class BB84Protocol(QKDProtocol):
+    """
+    Implementation of the BB84 Quantum Key Distribution protocol.
+    Uses four states: |0>, |1> (Z-basis) and |+>, |-> (X-basis).
+    """
     @property
-    def name(self):
+    def name(self) -> str:
         return "BB84"
 
-    def generate_bits(self, n):
+    def generate_bits(self, n: int) -> List[int]:
+        """Generate n random bits for Alice."""
         return [random.randint(0, 1) for _ in range(n)]
 
-    def generate_alice_bases(self, n):
+    def generate_alice_bases(self, n: int) -> List[str]:
+        """Generate n random bases ('Z' or 'X') for Alice."""
         return [random.choice(['Z', 'X']) for _ in range(n)]
 
-    def generate_bases(self, n):
+    def generate_bases(self, n: int) -> List[str]:
+        """Generate n random bases ('Z' or 'X') for Bob."""
         return [random.choice(['Z', 'X']) for _ in range(n)]
 
-    def encode(self, bits, bases):
+    def encode(self, bits: List[int], bases: List[str]) -> List[QuantumCircuit]:
+        """Encode bits into quantum circuits using BB84 states."""
         circuits = []
         for bit, base in zip(bits, bases):
             qc = QuantumCircuit(1, 1)
@@ -28,7 +37,8 @@ class BB84Protocol(QKDProtocol):
             circuits.append(qc)
         return circuits
 
-    def measure(self, circuits, bases, backend=None):
+    def measure(self, circuits: List[QuantumCircuit], bases: List[str], backend: Optional[Any] = None) -> Tuple[List[int], List[QuantumCircuit]]:
+        """Measure the received circuits in the specified bases."""
         if backend is None:
             backend = AerSimulator()
 
@@ -48,14 +58,14 @@ class BB84Protocol(QKDProtocol):
 
         results = []
         for i in range(len(circuits)):
-            # Qiskit 1.0.2 memory access for batched jobs
-            # job.result().get_memory(i) returns the list of memory entries for the i-th circuit
+            # Qiskit memory access for batched jobs
             mem = result_data.get_memory(i)
             results.append(int(mem[0]))
 
         return results, meas_circuits
 
-    def sift(self, alice_bases, bob_bases, alice_bits, bob_bits):
+    def sift(self, alice_bases: List[str], bob_bases: List[str], alice_bits: List[int], bob_bits: List[int]) -> Tuple[List[int], List[int], List[int]]:
+        """Perform key sifting where Alice and Bob compare bases."""
         sifted_a, sifted_b = [], []
         indices = []
         for i in range(len(alice_bits)):

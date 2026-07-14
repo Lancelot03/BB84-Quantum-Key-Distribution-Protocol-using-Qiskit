@@ -48,6 +48,16 @@ protocol_choice = st.sidebar.selectbox("Select Protocol", ["BB84", "B92"])
 use_real_hardware = st.sidebar.checkbox("Use Real Quantum Hardware (IBM)?", value=False)
 ibm_api_key = st.sidebar.text_input("IBM Quantum API Key", type="password", disabled=not use_real_hardware)
 
+with st.sidebar.expander("ℹ️ System Info"):
+    import qiskit
+    import streamlit as st_version
+    import platform
+    st.write(f"**OS:** {platform.system()}")
+    st.write(f"**Python:** {platform.python_version()}")
+    st.write(f"**Streamlit:** {st_version.__version__}")
+    st.write(f"**Qiskit:** {qiskit.__version__}")
+    st.write(f"**Backend:** AerSimulator")
+
 st.title("🔐 Quantum Key Distribution Simulator")
 
 tab1, tab2 = st.tabs(["🚀 Simulation", "🎓 Visual Learning"])
