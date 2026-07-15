@@ -90,7 +90,27 @@ def bloch_sphere(state_vector=[1, 0, 0], height=500):
             scene.add(axesHelper);
 
             // Labels for axes
-            // (Simplifying for now, can add text sprites later)
+            function createLabel(text, x, y, z) {{
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.width = 64;
+                canvas.height = 64;
+                context.font = 'Bold 48px Arial';
+                context.fillStyle = 'white';
+                context.textAlign = 'center';
+                context.fillText(text, 32, 48);
+
+                const texture = new THREE.CanvasTexture(canvas);
+                const spriteMaterial = new THREE.SpriteMaterial({{ map: texture }});
+                const sprite = new THREE.Sprite(spriteMaterial);
+                sprite.position.set(x, y, z);
+                sprite.scale.set(1, 1, 1);
+                return sprite;
+            }}
+
+            scene.add(createLabel('X', 3.5, 0, 0));
+            scene.add(createLabel('Z', 0, 3.5, 0));
+            scene.add(createLabel('Y', 0, 0, 3.5));
 
             // State Vector
             const dir = new THREE.Vector3({state_vector[0]}, {state_vector[2]}, {state_vector[1]}); // Three.js uses Y as up, Bloch uses Z as up
@@ -135,7 +155,33 @@ def draw_circuit_visual(qc):
     """
     return qc.draw(output='mpl')
 
-def photon_transmission(n_photons=10, height=300):
+def photon_transmission(n_photons=10, eve_present=False, height=300):
+    eve_html = '<div class="eve">Eve</div>' if eve_present else ""
+    eve_style = """
+            .eve {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                color: #ff4b4b;
+                font-family: sans-serif;
+                font-weight: bold;
+                padding: 10px;
+                border: 2px solid #ff4b4b;
+                border-radius: 5px;
+                background: #222;
+                z-index: 10;
+            }
+            .intercepted {
+                animation: travel 3s linear infinite, glitch 0.2s infinite;
+            }
+            @keyframes glitch {
+                0% { transform: translateY(-50%) translateX(0); }
+                50% { transform: translateY(-55%) translateX(2px); filter: hue-rotate(90deg); }
+                100% { transform: translateY(-50%) translateX(0); }
+            }
+    """ if eve_present else ""
+
     html_code = f"""
     <!DOCTYPE html>
     <html>
@@ -166,6 +212,7 @@ def photon_transmission(n_photons=10, height=300):
             }}
             .alice {{ left: 20px; }}
             .bob {{ right: 20px; }}
+            {eve_style}
 
             @keyframes travel {{
                 0% {{ left: 80px; opacity: 0; }}
@@ -177,6 +224,7 @@ def photon_transmission(n_photons=10, height=300):
     </head>
     <body>
         <div class="alice">Alice</div>
+        {eve_html}
         <div class="bob">Bob</div>
         <div id="photons-container"></div>
         <script>
@@ -184,8 +232,16 @@ def photon_transmission(n_photons=10, height=300):
             const n = {n_photons};
             for (let i = 0; i < n; i++) {{
                 const photon = document.createElement('div');
-                photon.className = 'photon';
+                photon.className = 'photon {"intercepted" if eve_present else ""}';
+                // Always set the base travel animation with staggered delay
                 photon.style.animation = `travel 3s linear ${{i * 0.5}}s infinite`;
+
+                // If intercepted, the 'glitch' animation is added via the CSS class.
+                // We need to ensure both can run or combine them.
+                if ("{ "intercepted" if eve_present else "" }") {{
+                    photon.style.animation = `travel 3s linear ${{i * 0.5}}s infinite, glitch 0.2s infinite`;
+                }}
+
                 container.appendChild(photon);
             }}
         </script>
