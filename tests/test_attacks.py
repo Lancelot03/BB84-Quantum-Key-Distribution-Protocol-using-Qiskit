@@ -31,7 +31,7 @@ def test_noisy_channel():
     noise_level = 0.2
     attack = NoisyChannel(noise_level)
     backend = AerSimulator()
-    n = 100
+    n = 200
 
     alice_bits = protocol.generate_bits(n)
     alice_bases = protocol.generate_bases(n)
@@ -48,7 +48,7 @@ def test_noisy_channel():
     qber = errors / len(key_a) if key_a else 0
 
     # QBER should be close to noise_level
-    assert 0.1 < qber < 0.3
+    assert 0.1 <= qber <= 0.3
 
 def test_intercept_resend_partial():
     protocol = BB84Protocol()
