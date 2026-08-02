@@ -1,0 +1,10 @@
+[global]
+developmentMode = false
+
+[server]
+enableCORS = false
+enableXsrfProtection = false
+port = 8501
+
+[browser]
+serverPort = 3000
