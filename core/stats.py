@@ -1,6 +1,6 @@
 def calculate_qber(alice_key, bob_key):
     """Calculate the Quantum Bit Error Rate (QBER)."""
-    if not alice_key or len(alice_key) != len(bob_key):
+    if not alice_key or len(alice_key) == 0 or len(alice_key) != len(bob_key):
         return 0.0
     errors = sum(a != b for a, b in zip(alice_key, bob_key))
     return errors / len(alice_key)

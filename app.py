@@ -1,5 +1,7 @@
 import streamlit as st
 import random
+import platform
+import qiskit
 from qiskit_aer import AerSimulator
 try:
     from qiskit_ibm_runtime import QiskitRuntimeService
@@ -47,6 +49,11 @@ st.sidebar.title("🛠️ Settings")
 protocol_choice = st.sidebar.selectbox("Select Protocol", ["BB84", "B92"])
 use_real_hardware = st.sidebar.checkbox("Use Real Quantum Hardware (IBM)?", value=False)
 ibm_api_key = st.sidebar.text_input("IBM Quantum API Key", type="password", disabled=not use_real_hardware)
+
+with st.sidebar.expander("ℹ️ System Info"):
+    st.write(f"**OS:** {platform.system()} {platform.release()}")
+    st.write(f"**Python:** {platform.python_version()}")
+    st.write(f"**Qiskit:** {qiskit.__version__}")
 
 st.title("🔐 Quantum Key Distribution Simulator")
 
@@ -133,12 +140,14 @@ with tab1:
             st.markdown(f"#### Qubit {i}")
             col_c1, col_c2 = st.columns(2)
             with col_c1:
-                st.markdown(f"**Alice's Encoding** (Basis: {viz_data['alice_bases'][i]}, Bit: {viz_data['alice_bits'][i]})")
+                st.markdown(f"**Alice's Encoding**")
+                st.write(f"Basis: `{viz_data['alice_bases'][i]}`, Bit: `{viz_data['alice_bits'][i]}`")
                 st.pyplot(draw_circuit_visual(viz_data['alice_circuits'][i]))
                 coords = get_bloch_coordinates(viz_data['alice_circuits'][i])
                 bloch_sphere(coords, height=300)
             with col_c2:
-                st.markdown(f"**Bob's Received State** (Basis: {viz_data['bob_bases'][i]})")
+                st.markdown(f"**Bob's Measurement**")
+                st.write(f"Basis: `{viz_data['bob_bases'][i]}`")
                 st.pyplot(draw_circuit_visual(viz_data['bob_circuits'][i]))
                 # Use received_circuits to show state BEFORE Bob's basis transformation
                 coords = get_bloch_coordinates(viz_data['received_circuits'][i])
@@ -222,7 +231,8 @@ with tab2:
 
         st.subheader("2. Photon Transmission")
         st.write("Alice sends qubits (photons) to Bob. If Eve is present, she might intercept and measure them, which introduces errors.")
-        photon_transmission(n_photons=8)
+        eve_learning = st.toggle("Show Eve in transmission animation", value=False)
+        photon_transmission(n_photons=8, eve_present=eve_learning)
 
         st.subheader("3. Live Basis Matching")
         st.write("After transmission, Alice and Bob announce their bases. They keep bits only where their bases matched.")

@@ -54,3 +54,19 @@ def test_engine_callback():
     assert len(messages) > 0
     assert "Initializing BB84 simulation" in messages[0]
     assert "Simulation complete." in messages[-1]
+
+def test_engine_attack_scaling():
+    engine = SimulationEngine()
+    protocol = BB84Protocol()
+
+    # Run with weak attack
+    attack_weak = InterceptResend(intercept_probability=0.2)
+    results_weak = engine.run(protocol, 200, attack=attack_weak)
+
+    # Run with strong attack
+    attack_strong = InterceptResend(intercept_probability=1.0)
+    results_strong = engine.run(protocol, 200, attack=attack_strong)
+
+    # Strong attack should generally result in higher QBER
+    # (Statistical variation possible, but 0.2 vs 1.0 is a large gap)
+    assert results_strong['qber'] > results_weak['qber']
