@@ -4,21 +4,25 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 def plot_bit_differences(key_a, key_b):
+    """Plot bit mismatches between Alice and Bob's keys."""
     diffs = [int(a != b) for a, b in zip(key_a, key_b)]
     fig, ax = plt.subplots(figsize=(10, 2))
-    ax.plot(diffs, marker='o', color='red', label='Mismatch')
+    ax.plot(diffs, marker='o', color='red', linestyle='', markersize=4, label='Mismatch')
     ax.set_title('Bit Differences (1 = Error)')
     ax.set_xlabel('Bit Index')
     ax.set_ylabel('Difference')
-    ax.grid(True)
+    ax.set_ylim(-0.2, 1.2)
+    ax.grid(True, alpha=0.3)
     return fig
 
 def plot_qber_bar(qber):
-    fig, ax = plt.subplots()
+    """Plot a bar chart showing the Quantum Bit Error Rate."""
+    fig, ax = plt.subplots(figsize=(5, 4))
     correct = 100 * (1 - qber)
     incorrect = 100 * qber
-    ax.bar(['Correct', 'Incorrect'], [correct, incorrect], color=['green', 'red'])
+    ax.bar(['Correct', 'Incorrect'], [correct, incorrect], color=['#2ecc71', '#e74c3c'])
     ax.set_title(f'QBER: {qber * 100:.2f}%')
+    ax.set_ylabel('Percentage (%)')
     ax.set_ylim(0, 100)
     return fig
 
@@ -30,7 +34,6 @@ def get_bloch_coordinates(qc):
     try:
         sv = Statevector.from_instruction(qc)
         # Expectation values for Pauli-X, Y, Z operators
-        # X = <sv|X|sv>, Y = <sv|Y|sv>, Z = <sv|Z|sv>
         x = sv.expectation_value([[0, 1], [1, 0]]).real
         y = sv.expectation_value([[0, -1j], [1j, 0]]).real
         z = sv.expectation_value([[1, 0], [0, -1]]).real
@@ -40,7 +43,8 @@ def get_bloch_coordinates(qc):
 
 def bloch_sphere(state_vector=[1, 0, 0], height=500):
     """
-    state_vector: [x, y, z] coordinates on the Bloch sphere
+    Render a 3D Bloch sphere using Three.js.
+    state_vector: [x, y, z] coordinates on the Bloch sphere.
     """
     html_code = f"""
     <!DOCTYPE html>
@@ -89,11 +93,8 @@ def bloch_sphere(state_vector=[1, 0, 0], height=500):
             const axesHelper = new THREE.AxesHelper(3);
             scene.add(axesHelper);
 
-            // Labels for axes
-            // (Simplifying for now, can add text sprites later)
-
             // State Vector
-            const dir = new THREE.Vector3({state_vector[0]}, {state_vector[2]}, {state_vector[1]}); // Three.js uses Y as up, Bloch uses Z as up
+            const dir = new THREE.Vector3({state_vector[0]}, {state_vector[2]}, {state_vector[1]}); // Three.js uses Y as up
             dir.normalize();
             const origin = new THREE.Vector3(0, 0, 0);
             const length = 2;
@@ -130,12 +131,21 @@ def bloch_sphere(state_vector=[1, 0, 0], height=500):
     return components.html(html_code, height=height)
 
 def draw_circuit_visual(qc):
-    """
-    Returns a matplotlib figure of the quantum circuit.
-    """
+    """Returns a matplotlib figure of the quantum circuit."""
     return qc.draw(output='mpl')
 
-def photon_transmission(n_photons=10, height=300):
+def photon_transmission(n_photons=10, height=300, eve_present=False):
+    """
+    Animate photons traveling from Alice to Bob.
+    If Eve is present, show her intercepting the channel.
+    """
+    eve_html = ""
+    if eve_present:
+        eve_html = '''
+        <div class="eve">Eve</div>
+        <div class="interceptor"></div>
+        '''
+
     html_code = f"""
     <!DOCTYPE html>
     <html>
@@ -144,15 +154,15 @@ def photon_transmission(n_photons=10, height=300):
             body {{ margin: 0; overflow: hidden; background-color: #0e1117; }}
             .photon {{
                 position: absolute;
-                width: 20px;
-                height: 20px;
+                width: 15px;
+                height: 15px;
                 border-radius: 50%;
                 background: radial-gradient(circle, #fff 0%, #00d2ff 100%);
                 box-shadow: 0 0 10px #00d2ff;
                 top: 50%;
                 transform: translateY(-50%);
             }}
-            .alice, .bob {{
+            .alice, .bob, .eve {{
                 position: absolute;
                 top: 50%;
                 transform: translateY(-50%);
@@ -163,9 +173,27 @@ def photon_transmission(n_photons=10, height=300):
                 border: 2px solid #555;
                 border-radius: 5px;
                 background: #222;
+                z-index: 10;
             }}
-            .alice {{ left: 20px; }}
-            .bob {{ right: 20px; }}
+            .alice {{ left: 20px; border-color: #3498db; }}
+            .bob {{ right: 20px; border-color: #2ecc71; }}
+            .eve {{
+                left: 50%;
+                transform: translate(-50%, -100%);
+                border-color: #e74c3c;
+                top: 40%;
+            }}
+            .interceptor {{
+                position: absolute;
+                left: 50%;
+                top: 50%;
+                width: 4px;
+                height: 40px;
+                background: #e74c3c;
+                transform: translate(-50%, -50%);
+                box-shadow: 0 0 10px #e74c3c;
+                opacity: 0.6;
+            }}
 
             @keyframes travel {{
                 0% {{ left: 80px; opacity: 0; }}
@@ -173,11 +201,22 @@ def photon_transmission(n_photons=10, height=300):
                 90% {{ opacity: 1; }}
                 100% {{ left: calc(100% - 100px); opacity: 0; }}
             }}
+
+            .eve-active {{
+                animation: jitter 0.2s infinite;
+            }}
+
+            @keyframes jitter {{
+                0% {{ transform: translate(-50%, -50%) scale(1); }}
+                50% {{ transform: translate(-50%, -50%) scale(1.2); }}
+                100% {{ transform: translate(-50%, -50%) scale(1); }}
+            }}
         </style>
     </head>
     <body>
         <div class="alice">Alice</div>
         <div class="bob">Bob</div>
+        {eve_html}
         <div id="photons-container"></div>
         <script>
             const container = document.getElementById('photons-container');
@@ -195,7 +234,7 @@ def photon_transmission(n_photons=10, height=300):
     return components.html(html_code, height=height)
 
 def basis_matching_visual(alice_bases, bob_bases, height=200):
-    matches = "".join(["✅" if a == b else "❌" for a, b in zip(alice_bases, bob_bases)])
+    """Visualize the basis sifting process."""
     html_code = f"""
     <!DOCTYPE html>
     <html>
@@ -226,22 +265,22 @@ def basis_matching_visual(alice_bases, bob_bases, height=200):
                 margin: 1px;
                 font-size: 12px;
             }}
-            .match {{ background-color: rgba(0, 255, 0, 0.2); }}
-            .mismatch {{ background-color: rgba(255, 0, 0, 0.2); }}
-            .label {{ width: 80px; text-align: right; margin-right: 10px; font-weight: bold; }}
+            .match {{ background-color: rgba(46, 204, 113, 0.3); border-color: #2ecc71; }}
+            .mismatch {{ background-color: rgba(231, 76, 60, 0.3); border-color: #e74c3c; }}
+            .label {{ width: 100px; text-align: right; margin-right: 10px; font-weight: bold; font-size: 14px; }}
         </style>
     </head>
     <body>
         <div class="row">
-            <div class="label">Alice Basis:</div>
+            <div class="label">Alice Basis</div>
             {"".join([f'<div class="cell">{b}</div>' for b in alice_bases])}
         </div>
         <div class="row">
-            <div class="label">Bob Basis:</div>
+            <div class="label">Bob Basis</div>
             {"".join([f'<div class="cell">{b}</div>' for b in bob_bases])}
         </div>
         <div class="row">
-            <div class="label">Match:</div>
+            <div class="label">Keep?</div>
             {"".join([f'<div class="cell {"match" if a==b else "mismatch"}">{ "✔" if a==b else "✘"}</div>' for a, b in zip(alice_bases, bob_bases)])}
         </div>
     </body>

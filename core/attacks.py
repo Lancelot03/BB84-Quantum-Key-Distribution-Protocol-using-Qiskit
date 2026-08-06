@@ -1,19 +1,36 @@
 import random
 from abc import ABC, abstractmethod
+from typing import List, Tuple, Dict, Any, Optional
 from qiskit import QuantumCircuit, transpile
 from qiskit_aer import AerSimulator
 
 class Attack(ABC):
+    """
+    Abstract base class for quantum channel attacks (eavesdropping).
+    """
     @abstractmethod
-    def apply(self, circuits, backend):
-        """Apply attack to the quantum circuits."""
+    def apply(self, circuits: List[QuantumCircuit], backend: Optional[Any]) -> Tuple[List[QuantumCircuit], Dict[str, Any]]:
+        """
+        Apply attack to the quantum circuits.
+
+        Args:
+            circuits: List of QuantumCircuit objects in transit.
+            backend: Optional Qiskit backend for Eve's measurements.
+
+        Returns:
+            A tuple containing (modified_circuits, attack_metadata).
+        """
         pass
 
 class InterceptResend(Attack):
-    def __init__(self, intercept_probability=1.0):
+    """
+    Eve intercepts a fraction of qubits, measures them in a random basis,
+    and resends a new qubit in the measured state to Bob.
+    """
+    def __init__(self, intercept_probability: float = 1.0):
         self.intercept_probability = intercept_probability
 
-    def apply(self, circuits, backend=None):
+    def apply(self, circuits: List[QuantumCircuit], backend: Optional[Any] = None) -> Tuple[List[QuantumCircuit], Dict[str, Any]]:
         if backend is None:
             backend = AerSimulator()
 
@@ -66,10 +83,14 @@ class InterceptResend(Attack):
         return new_circuits, intercepted_info
 
 class NoisyChannel(Attack):
-    def __init__(self, noise_level=0.1):
+    """
+    Simulates a noisy quantum channel that applies a bit-flip or phase-flip
+    with a certain probability.
+    """
+    def __init__(self, noise_level: float = 0.1):
         self.noise_level = noise_level
 
-    def apply(self, circuits, backend=None):
+    def apply(self, circuits: List[QuantumCircuit], backend: Optional[Any] = None) -> Tuple[List[QuantumCircuit], Dict[str, Any]]:
         new_circuits = []
         for qc in circuits:
             noisy_qc = qc.copy()
@@ -85,7 +106,11 @@ class NoisyChannel(Attack):
         return new_circuits, intercepted_info
 
 class PhotonNumberSplitting(Attack):
-    def apply(self, circuits, backend=None):
+    """
+    Simulates a Photon Number Splitting (PNS) attack on multi-photon pulses.
+    Eve gains information without introducing errors (in ideal cases).
+    """
+    def apply(self, circuits: List[QuantumCircuit], backend: Optional[Any] = None) -> Tuple[List[QuantumCircuit], Dict[str, Any]]:
         new_circuits = []
         for qc in circuits:
             noisy_qc = qc.copy()
