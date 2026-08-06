@@ -90,7 +90,27 @@ def bloch_sphere(state_vector=[1, 0, 0], height=500):
             scene.add(axesHelper);
 
             // Labels for axes
-            // (Simplifying for now, can add text sprites later)
+            function createTextSprite(text, position, color) {{
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.width = 64;
+                canvas.height = 64;
+                context.font = 'Bold 40px Arial';
+                context.fillStyle = color;
+                context.textAlign = 'center';
+                context.fillText(text, 32, 48);
+
+                const texture = new THREE.CanvasTexture(canvas);
+                const spriteMaterial = new THREE.SpriteMaterial({{ map: texture }});
+                const sprite = new THREE.Sprite(spriteMaterial);
+                sprite.position.copy(position);
+                sprite.scale.set(1, 1, 1);
+                return sprite;
+            }}
+
+            scene.add(createTextSprite('X', new THREE.Vector3(3.2, 0, 0), '#ff0000'));
+            scene.add(createTextSprite('Y', new THREE.Vector3(0, 0, 3.2), '#00ff00')); // Three.js Y is Bloch Z, Three.js Z is Bloch Y
+            scene.add(createTextSprite('Z', new THREE.Vector3(0, 3.2, 0), '#0000ff'));
 
             // State Vector
             const dir = new THREE.Vector3({state_vector[0]}, {state_vector[2]}, {state_vector[1]}); // Three.js uses Y as up, Bloch uses Z as up

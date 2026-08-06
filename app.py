@@ -26,6 +26,24 @@ from core import (
 
 # --- Quantum Logic Functions ---
 
+def get_protocol(protocol_choice):
+    if protocol_choice == "BB84":
+        return BB84Protocol()
+    elif protocol_choice == "B92":
+        return B92Protocol()
+    return BB84Protocol()
+
+def get_attack(eve_present, attack_choice, noise_level):
+    if not eve_present:
+        return None
+    if attack_choice == "Intercept-Resend":
+        return InterceptResend(noise_level)
+    elif attack_choice == "Noisy Channel":
+        return NoisyChannel(noise_level)
+    elif attack_choice == "Photon Number Splitting":
+        return PhotonNumberSplitting()
+    return None
+
 def get_backend(use_hardware=False, api_key=""):
     if use_hardware and api_key:
         try:
@@ -66,18 +84,9 @@ with tab1:
         backend = get_backend(use_real_hardware, ibm_api_key)
         engine = SimulationEngine()
 
-        # Initialize Protocol
-        protocol = BB84Protocol() if protocol_choice == "BB84" else B92Protocol()
-
-        # Initialize Attack
-        attack = None
-        if eve_present:
-            if attack_choice == "Intercept-Resend":
-                attack = InterceptResend(noise_level)
-            elif attack_choice == "Noisy Channel":
-                attack = NoisyChannel(noise_level)
-            else:
-                attack = PhotonNumberSplitting()
+        # Initialize Protocol and Attack using factory functions
+        protocol = get_protocol(protocol_choice)
+        attack = get_attack(eve_present, attack_choice, noise_level)
 
         # Progress Bar and Status
         progress_bar = st.progress(0.0)
