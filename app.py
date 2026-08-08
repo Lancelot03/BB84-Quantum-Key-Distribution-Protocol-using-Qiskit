@@ -48,6 +48,11 @@ protocol_choice = st.sidebar.selectbox("Select Protocol", ["BB84", "B92"])
 use_real_hardware = st.sidebar.checkbox("Use Real Quantum Hardware (IBM)?", value=False)
 ibm_api_key = st.sidebar.text_input("IBM Quantum API Key", type="password", disabled=not use_real_hardware)
 
+import platform
+with st.sidebar.expander("💻 System Info"):
+    st.write(f"**OS:** {platform.system()} {platform.release()}")
+    st.write(f"**Python Version:** {platform.python_version()}")
+
 st.title("🔐 Quantum Key Distribution Simulator")
 
 tab1, tab2 = st.tabs(["🚀 Simulation", "🎓 Visual Learning"])
@@ -222,7 +227,7 @@ with tab2:
 
         st.subheader("2. Photon Transmission")
         st.write("Alice sends qubits (photons) to Bob. If Eve is present, she might intercept and measure them, which introduces errors.")
-        photon_transmission(n_photons=8)
+        photon_transmission(n_photons=8, eve_present=eve_present)
 
         st.subheader("3. Live Basis Matching")
         st.write("After transmission, Alice and Bob announce their bases. They keep bits only where their bases matched.")
