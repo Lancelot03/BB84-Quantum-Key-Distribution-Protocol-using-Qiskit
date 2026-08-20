@@ -7,7 +7,7 @@ def test_intercept_resend():
     protocol = BB84Protocol()
     attack = InterceptResend()
     backend = AerSimulator()
-    n = 100
+    n = 200
 
     alice_bits = protocol.generate_bits(n)
     alice_bases = protocol.generate_bases(n)
