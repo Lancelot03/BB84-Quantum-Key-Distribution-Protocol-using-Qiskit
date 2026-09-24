@@ -1,16 +1,41 @@
-from core.stats import calculate_qber, analyze_security, generate_error_report
+from typing import Optional, Callable, Dict, Any
+from core.protocol import QKDProtocol
+from core.attacks import Attack
+from core.stats import calculate_qber, analyze_security, generate_error_report, calculate_info_leakage
 from core.reconciliation import CascadeReconciler
 from core.privacy import PrivacyAmplifier
 
 class SimulationEngine:
     """
-    Orchestrates the QKD simulation flow, decoupling the protocol logic from the UI.
+    Orchestrates the QKD simulation flow, decoupling the core protocol logic from the UI.
+    Handles bit/basis generation, encoding, channel attacks, measurement, sifting,
+    QBER security analysis, information reconciliation, and privacy amplification.
     """
-    def run(self, protocol, n, attack=None, backend=None, callback=None):
-        def log(msg, progress=None):
+
+    def run(
+        self,
+        protocol: QKDProtocol,
+        n: int,
+        attack: Optional[Attack] = None,
+        backend: Optional[Any] = None,
+        callback: Optional[Callable[..., None]] = None
+    ) -> Dict[str, Any]:
+        """
+        Execute an end-to-end QKD simulation run.
+
+        Args:
+            protocol: The QKD protocol instance (e.g. BB84Protocol, B92Protocol).
+            n: Number of qubits/bits to send.
+            attack: Optional attack model instance (e.g. InterceptResend, NoisyChannel).
+            backend: Qiskit Aer or hardware backend for circuit execution.
+            callback: Optional progress callback function `(msg: str, progress: float)`.
+
+        Returns:
+            Dictionary containing simulation results, keys, statistics, and circuits.
+        """
+        def log(msg: str, progress: Optional[float] = None) -> None:
             if callback:
                 try:
-                    # Enhanced callback to handle progress reporting
                     if progress is not None:
                         callback(msg, progress)
                     else:
@@ -51,7 +76,7 @@ class SimulationEngine:
         qber = calculate_qber(key_a, key_b)
         is_secure, security_status = analyze_security(qber)
 
-        # Phase 2: Post-Processing
+        # Post-Processing
         reconciled_key_b = key_b
         errors_fixed = 0
         final_key_a = key_a
@@ -67,7 +92,6 @@ class SimulationEngine:
             final_key_a = amplifier.amplify(key_a, qber)
             final_key_b = amplifier.amplify(reconciled_key_b, qber)
 
-        from core.stats import calculate_info_leakage
         leakage = calculate_info_leakage(qber, eve_info_gain)
 
         report = generate_error_report(alice_bits, bob_results, alice_bases, bob_bases, key_a, key_b, qber, protocol.name)

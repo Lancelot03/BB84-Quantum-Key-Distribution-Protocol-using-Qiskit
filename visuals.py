@@ -1,9 +1,11 @@
+from typing import List, Any
 import streamlit.components.v1 as components
+from qiskit import QuantumCircuit
 from qiskit.quantum_info import Statevector
-import numpy as np
 import matplotlib.pyplot as plt
 
-def plot_bit_differences(key_a, key_b):
+def plot_bit_differences(key_a: List[int], key_b: List[int]) -> plt.Figure:
+    """Plot bit-by-bit differences between Alice's and Bob's keys."""
     diffs = [int(a != b) for a, b in zip(key_a, key_b)]
     fig, ax = plt.subplots(figsize=(10, 2))
     ax.plot(diffs, marker='o', color='red', label='Mismatch')
@@ -13,7 +15,8 @@ def plot_bit_differences(key_a, key_b):
     ax.grid(True)
     return fig
 
-def plot_qber_bar(qber):
+def plot_qber_bar(qber: float) -> plt.Figure:
+    """Plot bar chart showing proportion of correct vs error bits based on QBER."""
     fig, ax = plt.subplots()
     correct = 100 * (1 - qber)
     incorrect = 100 * qber
@@ -22,25 +25,27 @@ def plot_qber_bar(qber):
     ax.set_ylim(0, 100)
     return fig
 
-def get_bloch_coordinates(qc):
+def get_bloch_coordinates(qc: QuantumCircuit) -> List[float]:
     """
     Calculate [x, y, z] Bloch coordinates from a QuantumCircuit.
-    Defaults to |0> state if calculation fails.
+    Defaults to |0> state [0.0, 0.0, 1.0] if calculation fails.
     """
     try:
         sv = Statevector.from_instruction(qc)
-        # Expectation values for Pauli-X, Y, Z operators
-        # X = <sv|X|sv>, Y = <sv|Y|sv>, Z = <sv|Z|sv>
         x = sv.expectation_value([[0, 1], [1, 0]]).real
         y = sv.expectation_value([[0, -1j], [1j, 0]]).real
         z = sv.expectation_value([[1, 0], [0, -1]]).real
         return [float(x), float(y), float(z)]
     except Exception:
-        return [0.0, 0.0, 1.0] # Default to |0>
+        return [0.0, 0.0, 1.0]
 
-def bloch_sphere(state_vector=[1, 0, 0], height=500):
+def bloch_sphere(state_vector: List[float] = [1, 0, 0], height: int = 500) -> Any:
     """
-    state_vector: [x, y, z] coordinates on the Bloch sphere
+    Render 3D interactive Bloch sphere in Streamlit via Three.js.
+
+    Args:
+        state_vector: [x, y, z] coordinates on the Bloch sphere.
+        height: Pixel height for component.
     """
     html_code = f"""
     <!DOCTYPE html>
@@ -89,11 +94,8 @@ def bloch_sphere(state_vector=[1, 0, 0], height=500):
             const axesHelper = new THREE.AxesHelper(3);
             scene.add(axesHelper);
 
-            // Labels for axes
-            // (Simplifying for now, can add text sprites later)
-
             // State Vector
-            const dir = new THREE.Vector3({state_vector[0]}, {state_vector[2]}, {state_vector[1]}); // Three.js uses Y as up, Bloch uses Z as up
+            const dir = new THREE.Vector3({state_vector[0]}, {state_vector[2]}, {state_vector[1]});
             dir.normalize();
             const origin = new THREE.Vector3(0, 0, 0);
             const length = 2;
@@ -129,13 +131,12 @@ def bloch_sphere(state_vector=[1, 0, 0], height=500):
     """
     return components.html(html_code, height=height)
 
-def draw_circuit_visual(qc):
-    """
-    Returns a matplotlib figure of the quantum circuit.
-    """
+def draw_circuit_visual(qc: QuantumCircuit) -> plt.Figure:
+    """Return matplotlib figure drawing of quantum circuit."""
     return qc.draw(output='mpl')
 
-def photon_transmission(n_photons=10, height=300):
+def photon_transmission(n_photons: int = 10, height: int = 300) -> Any:
+    """Render photon transmission animation from Alice to Bob."""
     html_code = f"""
     <!DOCTYPE html>
     <html>
@@ -194,8 +195,8 @@ def photon_transmission(n_photons=10, height=300):
     """
     return components.html(html_code, height=height)
 
-def basis_matching_visual(alice_bases, bob_bases, height=200):
-    matches = "".join(["✅" if a == b else "❌" for a, b in zip(alice_bases, bob_bases)])
+def basis_matching_visual(alice_bases: List[str], bob_bases: List[str], height: int = 200) -> Any:
+    """Render HTML comparison grid showing Alice's and Bob's bases and match indicators."""
     html_code = f"""
     <!DOCTYPE html>
     <html>
