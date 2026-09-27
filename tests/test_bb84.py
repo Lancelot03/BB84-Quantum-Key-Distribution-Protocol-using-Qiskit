@@ -42,3 +42,43 @@ def test_bb84_full_no_eve():
     key_a, key_b, _ = protocol.sift(alice_bases, bob_bases, alice_bits, bob_results)
 
     assert key_a == key_b
+
+def test_bb84_zero_qubits():
+    protocol = BB84Protocol()
+    assert protocol.generate_bits(0) == []
+    assert protocol.generate_bases(0) == []
+    circuits = protocol.encode([], [])
+    assert circuits == []
+    sifted_a, sifted_b, indices = protocol.sift([], [], [], [])
+    assert sifted_a == []
+    assert sifted_b == []
+    assert indices == []
+
+def test_bb84_zero_matching_bases():
+    protocol = BB84Protocol()
+    alice_bits = [0, 1]
+    alice_bases = ['Z', 'X']
+    bob_bases = ['X', 'Z']
+    bob_bits = [1, 0]
+
+    sifted_a, sifted_b, indices = protocol.sift(alice_bases, bob_bases, alice_bits, bob_bits)
+    assert sifted_a == []
+    assert sifted_b == []
+    assert indices == []
+
+def test_bb84_circuit_encoding():
+    protocol = BB84Protocol()
+    circuits = protocol.encode([0, 1, 1], ['Z', 'Z', 'X'])
+    assert len(circuits) == 3
+
+    # Bit 0, Z basis -> empty circuit
+    ops0 = [inst.operation.name for inst in circuits[0].data]
+    assert ops0 == []
+
+    # Bit 1, Z basis -> X gate
+    ops1 = [inst.operation.name for inst in circuits[1].data]
+    assert ops1 == ['x']
+
+    # Bit 1, X basis -> X gate, H gate
+    ops2 = [inst.operation.name for inst in circuits[2].data]
+    assert ops2 == ['x', 'h']
