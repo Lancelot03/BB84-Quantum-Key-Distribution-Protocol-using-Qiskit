@@ -175,9 +175,9 @@ def main():
                         help="Simulate an eavesdropper (Eve) on the channel")
     parser.add_argument("-a", "--attack", type=str,
                         choices=["Intercept-Resend", "Noisy Channel", "Photon Number Splitting"],
-                        default="Intercept-Resend",
+                        default=None,
                         help="Eavesdropper attack model (default: Intercept-Resend)")
-    parser.add_argument("-s", "--strength", type=float, default=0.1,
+    parser.add_argument("-s", "--strength", "--noise", type=float, default=None,
                         help="Attack strength / channel noise level between 0.0 and 0.5 (default: 0.1)")
     parser.add_argument("-i", "--interactive", action="store_true",
                         help="Run the runner in interactive console mode")
@@ -187,7 +187,10 @@ def main():
     if args.interactive:
         interactive_mode()
     else:
-        run_simulation(args.protocol, args.qubits, args.eve, args.attack, args.strength)
+        eve_present = args.eve or (args.attack is not None) or (args.strength is not None)
+        attack_name = args.attack if args.attack is not None else "Intercept-Resend"
+        noise_level = args.strength if args.strength is not None else 0.1
+        run_simulation(args.protocol, args.qubits, eve_present, attack_name, noise_level)
 
 if __name__ == "__main__":
     main()
