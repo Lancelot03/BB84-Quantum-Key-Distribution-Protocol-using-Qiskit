@@ -54,3 +54,7 @@ def test_engine_callback():
     assert len(messages) > 0
     assert "Initializing BB84 simulation" in messages[0]
     assert "Simulation complete." in messages[-1]
+
+def test_phase1_verification_flow():
+    from verify_phase1 import test_phase1
+    test_phase1()
