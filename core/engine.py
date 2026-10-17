@@ -1,4 +1,6 @@
-from core.stats import calculate_qber, analyze_security, generate_error_report
+from typing import List, Dict, Any, Optional, Callable
+from core.protocol import QKDProtocol
+from core.stats import calculate_qber, analyze_security, generate_error_report, calculate_info_leakage
 from core.reconciliation import CascadeReconciler
 from core.privacy import PrivacyAmplifier
 
@@ -6,17 +8,41 @@ class SimulationEngine:
     """
     Orchestrates the QKD simulation flow, decoupling the protocol logic from the UI.
     """
-    def run(self, protocol, n, attack=None, backend=None, callback=None):
-        def log(msg, progress=None):
+    def run(
+        self,
+        protocol: QKDProtocol,
+        n: int,
+        attack: Optional[Any] = None,
+        backend: Optional[Any] = None,
+        callback: Optional[Callable[[str, Optional[float]], None]] = None
+    ) -> Dict[str, Any]:
+        """
+        Run a full QKD simulation.
+
+        Args:
+            protocol: The QKD protocol instance (e.g., BB84Protocol).
+            n: Number of qubits to simulate.
+            attack: Optional attack model instance.
+            backend: Optional Qiskit backend.
+            callback: Optional UI callback for status and progress updates.
+
+        Returns:
+            A dictionary containing simulation results and metadata.
+        """
+        def log(msg: str, progress: Optional[float] = None) -> None:
             if callback:
+                import inspect
                 try:
-                    # Enhanced callback to handle progress reporting
-                    if progress is not None:
+                    sig = inspect.signature(callback)
+                    if len(sig.parameters) >= 2:
                         callback(msg, progress)
                     else:
                         callback(msg)
                 except Exception:
-                    pass
+                    try:
+                        callback(msg)
+                    except Exception:
+                        pass
 
         log(f"Initializing {protocol.name} simulation with {n} qubits...", 0.1)
 
@@ -67,7 +93,6 @@ class SimulationEngine:
             final_key_a = amplifier.amplify(key_a, qber)
             final_key_b = amplifier.amplify(reconciled_key_b, qber)
 
-        from core.stats import calculate_info_leakage
         leakage = calculate_info_leakage(qber, eve_info_gain)
 
         report = generate_error_report(alice_bits, bob_results, alice_bases, bob_bases, key_a, key_b, qber, protocol.name)

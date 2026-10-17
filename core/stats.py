@@ -1,23 +1,24 @@
-def calculate_qber(alice_key, bob_key):
+import math
+from typing import List, Tuple, Dict, Any
+
+def calculate_qber(alice_key: List[int], bob_key: List[int]) -> float:
     """Calculate the Quantum Bit Error Rate (QBER)."""
     if not alice_key or len(alice_key) != len(bob_key):
         return 0.0
     errors = sum(a != b for a, b in zip(alice_key, bob_key))
     return errors / len(alice_key)
 
-import math
-
-def analyze_security(qber, threshold=0.11):
+def analyze_security(qber: float, threshold: float = 0.11) -> Tuple[bool, str]:
     """Determine if the communication is secure based on QBER."""
     is_secure = qber <= threshold
     return is_secure, "Secure" if is_secure else "Compromised"
 
-def calculate_info_leakage(qber, info_gain_eve):
+def calculate_info_leakage(qber: float, info_gain_eve: float) -> float:
     """
     Estimate information leakage to Eve.
     Simplified model based on QBER and Eve's direct info gain.
     """
-    def h(p):
+    def h(p: float) -> float:
         if p <= 0 or p >= 1:
             return 0
         return -p * math.log2(p) - (1-p) * math.log2(1-p)
@@ -25,7 +26,16 @@ def calculate_info_leakage(qber, info_gain_eve):
     leakage = h(qber) + info_gain_eve
     return min(1.0, leakage)
 
-def generate_error_report(alice_bits, bob_results, alice_bases, bob_bases, sifted_alice, sifted_bob, qber, protocol_name):
+def generate_error_report(
+    alice_bits: List[int],
+    bob_results: List[int],
+    alice_bases: List[str],
+    bob_bases: List[str],
+    sifted_alice: List[int],
+    sifted_bob: List[int],
+    qber: float,
+    protocol_name: str
+) -> Dict[str, Any]:
     """
     Generate a detailed error analysis report.
     Supports both BB84 and B92 logic.
