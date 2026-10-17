@@ -3,3 +3,5 @@ __pycache__/
 .pytest_cache/
 streamlit.log
 verification/
+tests/videos/
+tests/test_frontend_flow.png
