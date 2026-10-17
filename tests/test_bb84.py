@@ -42,3 +42,29 @@ def test_bb84_full_no_eve():
     key_a, key_b, _ = protocol.sift(alice_bases, bob_bases, alice_bits, bob_results)
 
     assert key_a == key_b
+
+def test_bb84_sift_empty_inputs():
+    protocol = BB84Protocol()
+    alice_bits = []
+    alice_bases = []
+    bob_bases = []
+    bob_bits = []
+
+    sifted_a, sifted_b, indices = protocol.sift(alice_bases, bob_bases, alice_bits, bob_bits)
+
+    assert sifted_a == []
+    assert sifted_b == []
+    assert indices == []
+
+def test_bb84_sift_zero_matching_bases():
+    protocol = BB84Protocol()
+    alice_bits = [0, 1, 0, 1]
+    alice_bases = ['Z', 'Z', 'X', 'X']
+    bob_bases = ['X', 'X', 'Z', 'Z']
+    bob_bits = [1, 0, 1, 0]
+
+    sifted_a, sifted_b, indices = protocol.sift(alice_bases, bob_bases, alice_bits, bob_bits)
+
+    assert sifted_a == []
+    assert sifted_b == []
+    assert indices == []

@@ -90,7 +90,35 @@ def bloch_sphere(state_vector=[1, 0, 0], height=500):
             scene.add(axesHelper);
 
             // Labels for axes
-            // (Simplifying for now, can add text sprites later)
+            function makeTextSprite(message, color) {{
+                const canvas = document.createElement('canvas');
+                canvas.width = 64;
+                canvas.height = 64;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = color;
+                ctx.font = 'Bold 40px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(message, 32, 32);
+
+                const texture = new THREE.CanvasTexture(canvas);
+                const spriteMaterial = new THREE.SpriteMaterial({{ map: texture }});
+                const sprite = new THREE.Sprite(spriteMaterial);
+                sprite.scale.set(0.6, 0.6, 1);
+                return sprite;
+            }}
+
+            const labelX = makeTextSprite('X', '#ff4444');
+            labelX.position.set(2.5, 0, 0);
+            scene.add(labelX);
+
+            const labelY = makeTextSprite('Y', '#4444ff');
+            labelY.position.set(0, 0, 2.5);
+            scene.add(labelY);
+
+            const labelZ = makeTextSprite('Z', '#44ff44');
+            labelZ.position.set(0, 2.5, 0);
+            scene.add(labelZ);
 
             // State Vector
             const dir = new THREE.Vector3({state_vector[0]}, {state_vector[2]}, {state_vector[1]}); // Three.js uses Y as up, Bloch uses Z as up
@@ -135,7 +163,7 @@ def draw_circuit_visual(qc):
     """
     return qc.draw(output='mpl')
 
-def photon_transmission(n_photons=10, height=300):
+def photon_transmission(n_photons=10, height=300, eve_present=False):
     html_code = f"""
     <!DOCTYPE html>
     <html>
@@ -147,12 +175,20 @@ def photon_transmission(n_photons=10, height=300):
                 width: 20px;
                 height: 20px;
                 border-radius: 50%;
-                background: radial-gradient(circle, #fff 0%, #00d2ff 100%);
-                box-shadow: 0 0 10px #00d2ff;
                 top: 50%;
                 transform: translateY(-50%);
             }}
-            .alice, .bob {{
+            .photon.normal {{
+                background: radial-gradient(circle, #fff 0%, #00d2ff 100%);
+                box-shadow: 0 0 10px #00d2ff;
+                animation: travel 3s linear infinite;
+            }}
+            .photon.intercepted {{
+                background: radial-gradient(circle, #fff 0%, #00d2ff 100%);
+                box-shadow: 0 0 10px #00d2ff;
+                animation: travel-intercepted 3s linear infinite;
+            }}
+            .alice, .bob, .eve {{
                 position: absolute;
                 top: 50%;
                 transform: translateY(-50%);
@@ -163,9 +199,17 @@ def photon_transmission(n_photons=10, height=300):
                 border: 2px solid #555;
                 border-radius: 5px;
                 background: #222;
+                z-index: 10;
             }}
             .alice {{ left: 20px; }}
             .bob {{ right: 20px; }}
+            .eve {{
+                left: 50%;
+                transform: translate(-50%, -50%);
+                color: #ff4444;
+                border: 2px dashed #ff4444;
+                box-shadow: 0 0 10px rgba(255, 68, 68, 0.5);
+            }}
 
             @keyframes travel {{
                 0% {{ left: 80px; opacity: 0; }}
@@ -173,19 +217,31 @@ def photon_transmission(n_photons=10, height=300):
                 90% {{ opacity: 1; }}
                 100% {{ left: calc(100% - 100px); opacity: 0; }}
             }}
+
+            @keyframes travel-intercepted {{
+                0% {{ left: 80px; opacity: 0; background: radial-gradient(circle, #fff 0%, #00d2ff 100%); box-shadow: 0 0 10px #00d2ff; }}
+                10% {{ opacity: 1; }}
+                45% {{ background: radial-gradient(circle, #fff 0%, #00d2ff 100%); box-shadow: 0 0 10px #00d2ff; }}
+                50% {{ left: 50%; background: radial-gradient(circle, #ff0000 0%, #ff4444 100%); box-shadow: 0 0 15px #ff0000; transform: translateY(-50%) scale(1.3); }}
+                55% {{ background: radial-gradient(circle, #ffaa00 0%, #ffaa00 100%); box-shadow: 0 0 10px #ffaa00; transform: translateY(-50%) scale(1.0); }}
+                90% {{ opacity: 1; }}
+                100% {{ left: calc(100% - 100px); opacity: 0; background: radial-gradient(circle, #ffaa00 0%, #ffaa00 100%); box-shadow: 0 0 10px #ffaa00; }}
+            }}
         </style>
     </head>
     <body>
         <div class="alice">Alice</div>
+        {"<div class='eve'>Eve</div>" if eve_present else ""}
         <div class="bob">Bob</div>
         <div id="photons-container"></div>
         <script>
             const container = document.getElementById('photons-container');
             const n = {n_photons};
+            const isIntercepted = { "true" if eve_present else "false" };
             for (let i = 0; i < n; i++) {{
                 const photon = document.createElement('div');
-                photon.className = 'photon';
-                photon.style.animation = `travel 3s linear ${{i * 0.5}}s infinite`;
+                photon.className = isIntercepted ? 'photon intercepted' : 'photon normal';
+                photon.style.animationDelay = `${{i * 0.5}}s`;
                 container.appendChild(photon);
             }}
         </script>
